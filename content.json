@@ -1249,7 +1249,7 @@
   {
     "id": "ifc_demo1",
     "nombre": "BIM: Edificio de prueba IFC",
-    "archivo": "ValparaisoCLS.ifc",
+    "archivo": "Demo.ifc",
     "descripcion": "Modelo IFC de prueba para el visor BIM.",
     "categoria": "modelo-3d",
     "tamano": "~5 MB",
