@@ -524,7 +524,7 @@ function updateSunFromUI() {
 // content.json + carga IFC
 // ---------------------------------------------------------------------
 async function loadContentJson() {
-  const res = await fetch('/content.json', { cache: 'no-cache' });
+  const res = await fetch('/../content.json', { cache: 'no-cache' });
   if (!res.ok) throw new Error('No se pudo cargar content.json');
   const data = await res.json();
   if (!Array.isArray(data)) throw new Error('content.json no es un array');
@@ -837,7 +837,7 @@ function initUI() {
   const backBtn = document.getElementById('back-btn');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      window.location.href = '#volver';
+      window.location.href = 'index.html';
     });
   }
 
