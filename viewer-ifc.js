@@ -1,853 +1,995 @@
-// viewer-ifc.js
-(function () {
-  'use strict';
+// src/main.js
+import './style.css';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { IFCLoader } from 'web-ifc-three/IFCLoader.js';
 
-  // ── Escena y cámaras ──────────────────────────────────────────────
-  let scene, renderer;
-  let orbitCamera, walkCamera, flyCamera, orthoCamera, activeCamera, orbitControls;
-  let cameraMode = 'orbit';
-  let isOrthoOrbit = false;
-  let is2DModel = false;
+// ---------------------------------------------------------------------
+// Escena básica
+// ---------------------------------------------------------------------
+const app = document.querySelector('#app');
 
-  let modelGroup = null;
-  let groundMeshes = [];
-  let modelSize = new THREE.Vector3();
-  let modelSpan = 10;
-  let modelCenter = new THREE.Vector3();
+// Canvas Three
+const canvas = document.createElement('canvas');
+canvas.id = 'three-canvas';
+app.appendChild(canvas);
 
-  const raycaster = new THREE.Raycaster();
-  const downVec = new THREE.Vector3(0, -1, 0);
+// Renderer
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio || 1);
+renderer.setClearColor(0x020617, 1);
+renderer.shadowMap.enabled = true;
 
-  const keys = {};
-  const velocity = new THREE.Vector3();
-  const damping = 0.85;
-  let yaw = 0, pitch = 0;
-  const WALK_HEIGHT = 1.7;
+// Escena
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020617);
 
-  // ── Capas / categorías ────────────────────────────────────────────
-  let layerMeshes = {};
+// Cámaras
+let orbitCamera, walkCamera, flyCamera, orthoCamera, activeCamera;
+let orbitControls;
+let cameraMode = 'orbit';
+let isOrthoOrbit = false;
+let is2DModel = false;
 
-  // ── Estilos visuales ──────────────────────────────────────────────
-  let visualStyle = 'rendered';
-  const meshMatCache = {};
-  const LAYER_OVERRIDES = {
-    glass: { color: 0xadd8f7, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35 },
-    window: { color: 0xadd8f7, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35 },
-    water: { color: 0x1a6fa8, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.75 },
-    ocean: { color: 0x1a6fa8, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.75 },
-    terrain: { color: 0x8a7560, roughness: 0.9, metalness: 0.0 },
-    ground: { color: 0x8a7560, roughness: 0.9, metalness: 0.0 },
-    metal: { color: 0x888888, roughness: 0.3, metalness: 0.85 },
-    steel: { color: 0x888888, roughness: 0.3, metalness: 0.85 },
-    concrete: { color: 0xb0a898, roughness: 0.85, metalness: 0.0 }
-  };
+// Estado modelo
+let ifcModel = null;
+let modelGroup = new THREE.Group();
+scene.add(modelGroup);
+let groundMeshes = [];
+let modelCenter = new THREE.Vector3();
+let modelSize = new THREE.Vector3();
+let modelSpan = 10;
 
-  // ── Entorno / luz ─────────────────────────────────────────────────
-  let sun, fill, sky, skyUniforms;
+// Raycaster / movimiento
+const raycaster = new THREE.Raycaster();
+const downVec = new THREE.Vector3(0, -1, 0);
+const keys = {};
+const velocity = new THREE.Vector3();
+let yaw = 0,
+  pitch = 0;
+const WALK_HEIGHT = 1.7;
 
-  // ── Helpers DOM ───────────────────────────────────────────────────
-  function qs(sel) {
-    return document.querySelector(sel);
-  }
-  function qsa(sel) {
-    return Array.from(document.querySelectorAll(sel));
-  }
+// Luces
+let sun;
 
-  function showLoading(msg, detail) {
-    const el = document.getElementById('loading');
-    if (!el) return;
-    el.classList.remove('hidden');
-    const p = el.querySelector('p');
-    if (p && msg) p.textContent = msg;
-    const span = document.getElementById('loading-detail');
-    if (span && detail) span.textContent = detail;
-  }
+// ---------------------------------------------------------------------
+// Materiales y estilos
+// ---------------------------------------------------------------------
+let visualStyle = 'rendered';
+const meshMatCache = {};
+const ifcTypeToMeshes = new Map();
+const ifcVisibleTypes = new Set();
 
-  function hideLoading() {
-    const el = document.getElementById('loading');
-    if (el) el.classList.add('hidden');
-  }
+const LAYER_OVERRIDES = {
+  glass: {
+    color: 0xadd8f7,
+    roughness: 0.05,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.35,
+  },
+  window: {
+    color: 0xadd8f7,
+    roughness: 0.05,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.35,
+  },
+  concrete: {
+    color: 0xb0a898,
+    roughness: 0.85,
+    metalness: 0.0,
+  },
+};
 
-  // ── Querystring ───────────────────────────────────────────────────
-  function getIdFromQuery() {
-    const p = new URLSearchParams(window.location.search);
-    return p.get('id') || null;
-  }
+function buildMatSet(hexColor, layerName) {
+  const lname = (layerName || '').toLowerCase();
+  let ovr = null;
+  Object.keys(LAYER_OVERRIDES).forEach((k) => {
+    if (!ovr && lname.indexOf(k) !== -1) ovr = LAYER_OVERRIDES[k];
+  });
 
-  // ── Entorno y fondo ───────────────────────────────────────────────
-  function initSky() {
-    if (sky) return;
-    sky = new THREE.Sky();
-    sky.scale.setScalar(450000);
-    scene.add(sky);
-    skyUniforms = sky.material.uniforms;
-    skyUniforms['turbidity'].value = 10;
-    skyUniforms['rayleigh'].value = 3;
-    skyUniforms['mieCoefficient'].value = 0.005;
-    skyUniforms['mieDirectionalG'].value = 0.7;
-  }
-
-  function updateSun() {
-    if (!sun) return;
-    const az = parseFloat(qs('#sun-az').value);
-    const el = parseFloat(qs('#sun-el').value);
-    const azEl = document.getElementById('az-val');
-    const elEl = document.getElementById('el-val');
-    if (azEl) azEl.textContent = az + '°';
-    if (elEl) elEl.textContent = el + '°';
-
-    const phi = (90 - el) * (Math.PI / 180);
-    const theta = (az + 180) * (Math.PI / 180);
-    const dist = modelSpan * 2.5;
-
-    sun.position.set(
-      modelCenter.x + dist * Math.sin(phi) * Math.cos(theta),
-      modelCenter.y + dist * Math.cos(phi),
-      modelCenter.z + dist * Math.sin(phi) * Math.sin(theta)
-    );
-    sun.target.position.copy(modelCenter);
-    sun.target.updateMatrixWorld();
-
-    if (skyUniforms) {
-      skyUniforms['sunPosition'].value.copy(sun.position);
-    }
-
-    const d = modelSpan * 1.5;
-    sun.shadow.camera.left = -d;
-    sun.shadow.camera.right = d;
-    sun.shadow.camera.top = d;
-    sun.shadow.camera.bottom = -d;
-    sun.shadow.camera.updateProjectionMatrix();
-  }
-
-  function changeBackground(type) {
-    if (!scene) return;
-
-    if (sky) {
-      scene.remove(sky);
-      sky = null;
-      skyUniforms = null;
-    }
-
-    if (type === 'black') {
-      scene.background = new THREE.Color(0x050608);
-    } else if (type === 'white') {
-      scene.background = new THREE.Color(0xffffff);
-    } else if (type === 'grey') {
-      scene.background = new THREE.Color(0x22262e);
-    } else if (type === 'sky' || type === 'sunset') {
-      initSky();
-      if (type === 'sunset') {
-        qs('#sun-el').value = 2;
-        qs('#sun-az').value = 180;
-        skyUniforms['turbidity'].value = 20;
-        skyUniforms['rayleigh'].value = 2;
-      } else {
-        skyUniforms['turbidity'].value = 10;
-        skyUniforms['rayleigh'].value = 3;
-      }
-      updateSun();
-      scene.background = null;
-    } else if (type === 'gradient') {
-      const canvas = document.createElement('canvas');
-      canvas.width = 2;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      const grad = ctx.createLinearGradient(0, 0, 0, 512);
-      grad.addColorStop(0, '#020617');
-      grad.addColorStop(1, '#1e293b');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 2, 512);
-      scene.background = new THREE.CanvasTexture(canvas);
-    }
-  }
-  window.changeBackground = changeBackground;
-
-  function toggleShadows(enabled) {
-    if (!renderer || !sun) return;
-    sun.castShadow = enabled;
-    if (modelGroup) {
-      modelGroup.traverse(function (obj) {
-        if (obj.isMesh) {
-          obj.castShadow = obj.receiveShadow = enabled;
-        }
-      });
-    }
-  }
-
-  // ── Cámara y navegación ───────────────────────────────────────────
-  function updateModeUI() {
-    const labels = { orbit: 'Orbit', walk: 'Walk', fly: 'Fly', ortho: 'Top View' };
-    const el = document.getElementById('mode-label');
-    if (el) el.textContent = labels[cameraMode] || cameraMode;
-    qsa('.cam-btn[data-mode]').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.mode === cameraMode);
-    });
-    document.dispatchEvent(new CustomEvent('modchange', { detail: cameraMode }));
-  }
-
-  function getGroundY(x, z) {
-    if (groundMeshes.length === 0) return modelCenter.y;
-    const origin = new THREE.Vector3(x, modelCenter.y + modelSpan * 5, z);
-    raycaster.set(origin, downVec);
-    const hits = raycaster.intersectObjects(groundMeshes, false);
-    return hits.length > 0 ? hits[0].point.y : modelCenter.y;
-  }
-
-  function checkCollision(pos, radius) {
-    if (groundMeshes.length === 0) return false;
-    const dirs = [
-      new THREE.Vector3(1, 0, 0),
-      new THREE.Vector3(-1, 0, 0),
-      new THREE.Vector3(0, 0, 1),
-      new THREE.Vector3(0, 0, -1)
-    ];
-    for (let h of [0.5, WALK_HEIGHT, WALK_HEIGHT * 0.8]) {
-      const p = pos.clone();
-      p.y = pos.y - WALK_HEIGHT + h;
-      for (let d of dirs) {
-        raycaster.set(p, d);
-        const hits = raycaster.intersectObjects(groundMeshes, false);
-        if (hits.length > 0 && hits[0].distance < radius) return true;
-      }
-    }
-    return false;
-  }
-
-  function syncOrthoCamera() {
-    if (!orthoCamera) return;
-    const aspect = window.innerWidth / window.innerHeight;
-    const halfH = modelSpan * 0.7;
-    const halfW = halfH * aspect;
-    orthoCamera.left = -halfW;
-    orthoCamera.right = halfW;
-    orthoCamera.top = halfH;
-    orthoCamera.bottom = -halfH;
-
-    if (cameraMode === 'orbit' && isOrthoOrbit) {
-      const dir = new THREE.Vector3().subVectors(orbitCamera.position, orbitControls.target).normalize();
-      orthoCamera.position.copy(orbitControls.target).addScaledVector(dir, modelSpan * 5);
-      orthoCamera.lookAt(orbitControls.target);
-    } else {
-      orthoCamera.position.set(modelCenter.x, modelCenter.y + modelSpan * 5, modelCenter.z);
-      orthoCamera.lookAt(modelCenter);
-    }
-
-    orthoCamera.updateProjectionMatrix();
-  }
-
-  function setCameraMode(mode) {
-    if (is2DModel && mode !== 'ortho') return;
-    const prev = cameraMode;
-    cameraMode = mode;
-
-    if ((prev === 'walk' || prev === 'fly') && document.pointerLockElement) {
-      document.exitPointerLock();
-    }
-
-    if (mode === 'orbit') {
-      activeCamera = isOrthoOrbit ? orthoCamera : orbitCamera;
-      orbitControls.object = activeCamera;
-      orbitControls.enabled = true;
-      orbitControls.enableRotate = true;
-      orbitControls.mouseButtons = {
-        LEFT: THREE.MOUSE.ROTATE,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.PAN
-      };
-    } else if (mode === 'walk') {
-      activeCamera = walkCamera;
-      orbitControls.enabled = false;
-      const target = orbitControls.target.clone();
-      const groundY = getGroundY(target.x, target.z);
-      walkCamera.position.set(target.x, groundY + WALK_HEIGHT, target.z + modelSpan * 0.05);
-      walkCamera.rotation.set(0, 0, 0, 'YXZ');
-      yaw = 0;
-      pitch = 0;
-    } else if (mode === 'fly') {
-      activeCamera = flyCamera;
-      orbitControls.enabled = false;
-      flyCamera.position.copy(orbitCamera.position);
-      flyCamera.lookAt(orbitControls.target);
-      yaw = flyCamera.rotation.y;
-      pitch = flyCamera.rotation.x;
-    } else if (mode === 'ortho') {
-      activeCamera = orthoCamera;
-      orbitControls.object = orthoCamera;
-      orbitControls.enabled = true;
-      orbitControls.enableRotate = false;
-      orbitControls.mouseButtons = {
-        LEFT: THREE.MOUSE.PAN,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.PAN
-      };
-      syncOrthoCamera();
-    }
-
-    velocity.set(0, 0, 0);
-    updateModeUI();
-  }
-  window.setCameraMode = setCameraMode;
-
-  function toggleOrtho() {
-    isOrthoOrbit = !isOrthoOrbit;
-    const btn = document.getElementById('ortho-toggle');
-    if (btn) btn.classList.toggle('active', isOrthoOrbit);
-    if (cameraMode === 'orbit') {
-      activeCamera = isOrthoOrbit ? orthoCamera : orbitCamera;
-      if (isOrthoOrbit) syncOrthoCamera();
-      orbitControls.object = activeCamera;
-      orbitControls.update();
-    }
-  }
-  window.toggleOrtho = toggleOrtho;
-
-  function resetCamera() {
-    if (!modelGroup) return;
-    isOrthoOrbit = false;
-    const btn = document.getElementById('ortho-toggle');
-    if (btn) btn.classList.remove('active');
-
-    const d = modelSpan;
-    orbitCamera.position.set(
-      modelCenter.x + d * 1.4,
-      modelCenter.y + d * 1.2,
-      modelCenter.z + d * 1.4
-    );
-    orbitControls.target.copy(modelCenter);
-    activeCamera = orbitCamera;
-    orbitControls.object = activeCamera;
-    orbitControls.update();
-
-    if (cameraMode === 'ortho') {
-      syncOrthoCamera();
-    }
-  }
-  window.resetCamera = resetCamera;
-
-  // ── Estilos / materiales ───────────────────────────────────────────
-  function buildMatSet(hexColor, layerName) {
-    const lname = (layerName || '').toLowerCase();
-    let ovr = null;
-    Object.keys(LAYER_OVERRIDES).forEach(k => {
-      if (!ovr && lname.indexOf(k) !== -1) ovr = LAYER_OVERRIDES[k];
-    });
-
-    const rendParams = ovr
-      ? Object.assign({ side: THREE.DoubleSide }, ovr)
-      : {
-          color: hexColor,
-          roughness: 0.72,
-          metalness: 0.05,
-          side: THREE.DoubleSide
-        };
-
-    rendParams.polygonOffset = true;
-    rendParams.polygonOffsetFactor = 1;
-    rendParams.polygonOffsetUnits = 1;
-
-    return {
-      rendered: new THREE.MeshStandardMaterial(rendParams),
-      clay: new THREE.MeshStandardMaterial({
-        color: 0xd4c5b0,
-        roughness: 0.75,
-        metalness: 0.0,
-        side: THREE.DoubleSide
-      }),
-      wireframe: new THREE.MeshStandardMaterial({
+  const rendParams = ovr
+    ? Object.assign({ side: THREE.DoubleSide }, ovr)
+    : {
         color: hexColor,
-        wireframe: true,
-        side: THREE.DoubleSide
-      }),
-      xray: new THREE.MeshStandardMaterial({
-        color: hexColor,
-        transparent: true,
-        opacity: 0.18,
-        roughness: 0.3,
-        metalness: 0.0,
+        roughness: 0.72,
+        metalness: 0.05,
         side: THREE.DoubleSide,
-        depthWrite: false
-      })
+      };
+
+  rendParams.polygonOffset = true;
+  rendParams.polygonOffsetFactor = 1;
+  rendParams.polygonOffsetUnits = 1;
+
+  return {
+    rendered: new THREE.MeshStandardMaterial(rendParams),
+    clay: new THREE.MeshStandardMaterial({
+      color: 0xd4c5b0,
+      roughness: 0.75,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    }),
+    wireframe: new THREE.MeshStandardMaterial({
+      color: hexColor,
+      wireframe: true,
+      side: THREE.DoubleSide,
+    }),
+    xray: new THREE.MeshStandardMaterial({
+      color: hexColor,
+      transparent: true,
+      opacity: 0.18,
+      roughness: 0.3,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  };
+}
+
+function applyStyle(style) {
+  visualStyle = style;
+  document
+    .querySelectorAll('.style-btn')
+    .forEach((b) => b.classList.toggle('active', b.dataset.style === style));
+
+  if (!modelGroup) return;
+  modelGroup.traverse((obj) => {
+    if (obj.isMesh && meshMatCache[obj.uuid]) {
+      obj.material =
+        meshMatCache[obj.uuid][style] || meshMatCache[obj.uuid].rendered;
+    }
+  });
+}
+window.applyStyle = applyStyle;
+
+// ---------------------------------------------------------------------
+// Planos de corte (4)
+// ---------------------------------------------------------------------
+let planeBottom = null; // desde abajo (Y min -> Y max)
+let planeTop = null; // desde arriba (Y max -> Y min)
+let planeLeft = null; // desde izquierda (X min -> X max)
+let planeRight = null; // desde derecha (X max -> X min)
+let planeFront = null; // nuevo: desde frente (Z min -> Z max)
+let planeBack = null;  // nuevo: desde fondo (Z max -> Z min)
+let clippingEnabled = true;
+
+function setupClippingPlanes(box) {
+  const min = box.min;
+  const max = box.max;
+
+  // Normales
+  const up = new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3(1, 0, 0);
+  const forward = new THREE.Vector3(0, 0, 1);
+
+  // Bottom: normal (0,1,0), constant = -y
+  planeBottom = new THREE.Plane(up.clone(), -min.y);
+  planeBottom._minY = min.y;
+  planeBottom._maxY = max.y;
+
+  // Top: normal (0,-1,0), constant = y
+  planeTop = new THREE.Plane(up.clone().negate(), max.y);
+  planeTop._minY = min.y;
+  planeTop._maxY = max.y;
+
+  // Left: normal (1,0,0), constant = -x
+  planeLeft = new THREE.Plane(right.clone(), -min.x);
+  planeLeft._minX = min.x;
+  planeLeft._maxX = max.x;
+
+  // Right: normal (-1,0,0), constant = x
+  planeRight = new THREE.Plane(right.clone().negate(), max.x);
+  planeRight._minX = min.x;
+  planeRight._maxX = max.x;
+
+  // Front: normal (0,0,1), constant = -z
+  planeFront = new THREE.Plane(forward.clone(), -min.z);
+  planeFront._minZ = min.z;
+  planeFront._maxZ = max.z;
+
+  // Back: normal (0,0,-1), constant = z
+  planeBack = new THREE.Plane(forward.clone().negate(), max.z);
+  planeBack._minZ = min.z;
+  planeBack._maxZ = max.z;
+
+  renderer.localClippingEnabled = true;
+  updateClippingEnabled(clippingEnabled);
+}
+
+function updateCutBottom(percent) {
+  if (!planeBottom) return;
+  const minY = planeBottom._minY;
+  const maxY = planeBottom._maxY;
+  const y = minY + (maxY - minY) * (percent / 100);
+  planeBottom.constant = -y;
+}
+
+function updateCutTop(percent) {
+  if (!planeTop) return;
+  const minY = planeTop._minY;
+  const maxY = planeTop._maxY;
+  const y = maxY - (maxY - minY) * (percent / 100);
+  planeTop.constant = y;
+}
+
+function updateCutLeft(percent) {
+  if (!planeLeft) return;
+  const minX = planeLeft._minX;
+  const maxX = planeLeft._maxX;
+  const x = minX + (maxX - minX) * (percent / 100);
+  planeLeft.constant = -x;
+}
+
+function updateCutRight(percent) {
+  if (!planeRight) return;
+  const minX = planeRight._minX;
+  const maxX = planeRight._maxX;
+  const x = maxX - (maxX - minX) * (percent / 100);
+  planeRight.constant = x;
+}
+
+function updateCutFront(percent) {
+  if (!planeFront) return;
+  const minZ = planeFront._minZ;
+  const maxZ = planeFront._maxZ;
+  const z = minZ + (maxZ - minZ) * (percent / 100);
+  planeFront.constant = -z;
+}
+
+function updateCutBack(percent) {
+  if (!planeBack) return;
+  const minZ = planeBack._minZ;
+  const maxZ = planeBack._maxZ;
+  const z = maxZ - (maxZ - minZ) * (percent / 100);
+  planeBack.constant = z;
+}
+
+function updateClippingEnabled(enabled) {
+  clippingEnabled = enabled;
+  if (enabled) {
+    const planes = [];
+    if (planeBottom) planes.push(planeBottom);
+    if (planeTop) planes.push(planeTop);
+    if (planeLeft) planes.push(planeLeft);
+    if (planeRight) planes.push(planeRight);
+    if (planeFront) planes.push(planeFront); 
+    if (planeBack) planes.push(planeBack);   
+    renderer.clippingPlanes = planes;
+  } else {
+    renderer.clippingPlanes = [];
+  }
+}
+
+// ---------------------------------------------------------------------
+// Cámaras y modos
+// ---------------------------------------------------------------------
+function initCameras() {
+  const aspect = window.innerWidth / window.innerHeight;
+
+  orbitCamera = new THREE.PerspectiveCamera(60, aspect, 0.1, 5000);
+  walkCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 500);
+  flyCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 2000);
+  orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 5000);
+
+  activeCamera = orbitCamera;
+
+  orbitControls = new OrbitControls(orbitCamera, renderer.domElement);
+  orbitControls.enableDamping = true;
+}
+
+function updateModeUI() {
+  const labels = { orbit: 'Orbit', walk: 'Walk', fly: 'Fly', ortho: 'Top View' };
+  const el = document.getElementById('mode-label');
+  if (el) el.textContent = labels[cameraMode] || cameraMode;
+
+  document.querySelectorAll('.cam-btn[data-mode]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === cameraMode);
+  });
+}
+
+
+function getGroundY(x, z) {
+  if (groundMeshes.length === 0) return modelCenter.y;
+  const origin = new THREE.Vector3(x, modelCenter.y + modelSpan * 5, z);
+  raycaster.set(origin, downVec);
+  const hits = raycaster.intersectObjects(groundMeshes, false);
+  return hits.length > 0 ? hits[0].point.y : modelCenter.y;
+}
+
+function checkCollision(pos, radius) {
+  if (groundMeshes.length === 0) return false;
+  const dirs = [
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 0, -1),
+  ];
+
+  for (let h of [0.5, WALK_HEIGHT, WALK_HEIGHT * 0.8]) {
+    const p = pos.clone();
+    p.y = pos.y - WALK_HEIGHT + h;
+    for (let d of dirs) {
+      raycaster.set(p, d);
+      const hits = raycaster.intersectObjects(groundMeshes, false);
+      if (hits.length > 0 && hits[0].distance < radius) return true;
+    }
+  }
+  return false;
+}
+
+function syncOrthoCamera() {
+  if (!orthoCamera) return;
+  const aspect = window.innerWidth / window.innerHeight;
+  const halfH = modelSpan * 0.7;
+  const halfW = halfH * aspect;
+
+  orthoCamera.left = -halfW;
+  orthoCamera.right = halfW;
+  orthoCamera.top = halfH;
+  orthoCamera.bottom = -halfH;
+
+  if (cameraMode === 'orbit' && isOrthoOrbit) {
+    const dir = new THREE.Vector3()
+      .subVectors(orbitCamera.position, orbitControls.target)
+      .normalize();
+    orthoCamera.position
+      .copy(orbitControls.target)
+      .addScaledVector(dir, modelSpan * 5);
+    orthoCamera.lookAt(orbitControls.target);
+  } else {
+    orthoCamera.position.set(
+      modelCenter.x,
+      modelCenter.y + modelSpan * 5,
+      modelCenter.z
+    );
+    orthoCamera.lookAt(modelCenter);
+  }
+
+  orthoCamera.updateProjectionMatrix();
+}
+
+function setCameraMode(mode) {
+  if (is2DModel && mode !== 'ortho') return;
+
+  const prev = cameraMode;
+  cameraMode = mode;
+
+  if ((prev === 'walk' || prev === 'fly') && document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+
+  if (mode === 'orbit') {
+    activeCamera = isOrthoOrbit ? orthoCamera : orbitCamera;
+    orbitControls.object = activeCamera;
+    orbitControls.enabled = true;
+    orbitControls.enableRotate = true;
+    orbitControls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
     };
-  }
-
-  function applyStyle(style) {
-    visualStyle = style;
-    qsa('.style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
-    if (!modelGroup) return;
-    modelGroup.traverse(obj => {
-      if (obj.isMesh && meshMatCache[obj.uuid]) {
-        obj.material = meshMatCache[obj.uuid][style] || meshMatCache[obj.uuid].rendered;
-      }
-    });
-  }
-  window.applyStyle = applyStyle;
-
-  function updateLayersUI() {
-    const list = document.getElementById('layers-list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    const names = Object.keys(layerMeshes).sort();
-    if (names.length === 0) {
-      list.textContent = 'Sin capas BIM disponibles.';
-      return;
-    }
-
-    names.forEach(name => {
-      const row = document.createElement('div');
-      row.className = 'layer-item';
-
-      const label = document.createElement('label');
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = true;
-      cb.addEventListener('change', () => {
-        const meshes = layerMeshes[name];
-        meshes.forEach(m => {
-          m.visible = cb.checked;
-        });
-      });
-
-      const span = document.createElement('span');
-      span.textContent = name;
-
-      label.appendChild(cb);
-      label.appendChild(span);
-      row.appendChild(label);
-      list.appendChild(row);
-    });
-  }
-
-  // ── Renderer y cámaras ─────────────────────────────────────────────
-  function initRendererAndCameras() {
-    const canvas = document.getElementById('three-canvas');
-
-    renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true
-    });
-    renderer.setPixelRatio(window.devicePixelRatio || 1);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020617);
-
-    const aspect = window.innerWidth / window.innerHeight;
-
-    orbitCamera = new THREE.PerspectiveCamera(50, aspect, 0.1, 2000);
-    walkCamera = new THREE.PerspectiveCamera(60, aspect, 0.1, 2000);
-    flyCamera = new THREE.PerspectiveCamera(60, aspect, 0.1, 4000);
-    orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 4000);
-
-    activeCamera = orbitCamera;
-
-    orbitControls = new THREE.OrbitControls(orbitCamera, renderer.domElement);
-    orbitControls.enableDamping = true;
-    orbitControls.dampingFactor = 0.06;
-    orbitControls.rotateSpeed = 0.9;
-    orbitControls.zoomSpeed = 1.0;
-    orbitControls.panSpeed = 0.8;
-
-    sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.position.set(50, 100, 30);
-    sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
-    sun.shadow.bias = -0.0005;
-    scene.add(sun);
-    sun.target.position.set(0, 0, 0);
-    scene.add(sun.target);
-
-    fill = new THREE.HemisphereLight(0xeeeeff, 0x111322, 0.4);
-    scene.add(fill);
-
-    changeBackground('gradient');
-
-    const shadowsToggle = document.getElementById('shadows-toggle');
-    if (shadowsToggle) {
-      shadowsToggle.addEventListener('change', () => {
-        toggleShadows(shadowsToggle.checked);
-      });
-    }
-
-    ['sun-az', 'sun-el'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.addEventListener('input', updateSun);
-      }
-    });
-
-    window.addEventListener('resize', onWindowResize);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-
-    animate();
-  }
-
-  function onWindowResize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    renderer.setSize(w, h);
-
-    [orbitCamera, walkCamera, flyCamera].forEach(cam => {
-      cam.aspect = w / h;
-      cam.updateProjectionMatrix();
-    });
-
+  } else if (mode === 'walk') {
+    activeCamera = walkCamera;
+    orbitControls.enabled = false;
+    const target = orbitControls.target.clone();
+    const groundY = getGroundY(target.x, target.z);
+    walkCamera.position.set(
+      target.x,
+      groundY + WALK_HEIGHT,
+      target.z + modelSpan * 0.05
+    );
+    walkCamera.rotation.set(0, 0, 0, 'YXZ');
+    yaw = 0;
+    pitch = 0;
+  } else if (mode === 'fly') {
+    activeCamera = flyCamera;
+    orbitControls.enabled = false;
+    flyCamera.position.copy(orbitCamera.position);
+    flyCamera.lookAt(orbitControls.target);
+    yaw = flyCamera.rotation.y;
+    pitch = flyCamera.rotation.x;
+  } else if (mode === 'ortho') {
+    activeCamera = orthoCamera;
+    orbitControls.object = orthoCamera;
+    orbitControls.enabled = true;
+    orbitControls.enableRotate = false;
+    orbitControls.mouseButtons = {
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
     syncOrthoCamera();
   }
 
-  function onKeyDown(e) {
-    keys[e.code] = true;
-    if (e.code === 'KeyR') {
-      resetCamera();
-    }
+  velocity.set(0, 0, 0);
+  updateModeUI();
+}
+
+function toggleOrtho() {
+  isOrthoOrbit = !isOrthoOrbit;
+  const btn = document.getElementById('ortho-toggle');
+  if (btn) btn.classList.toggle('active', isOrthoOrbit);
+
+  if (cameraMode === 'orbit') {
+    activeCamera = isOrthoOrbit ? orthoCamera : orbitCamera;
+    if (isOrthoOrbit) syncOrthoCamera();
+    orbitControls.object = activeCamera;
+    orbitControls.update();
+  } else if (cameraMode === 'ortho') {
+    cameraMode = 'orbit';
+    updateModeUI();
   }
+}
 
-  function onKeyUp(e) {
-    keys[e.code] = false;
+function resetCamera() {
+  if (!modelGroup) return;
+  isOrthoOrbit = false;
+  const btn = document.getElementById('ortho-toggle');
+  if (btn) btn.classList.remove('active');
+
+  const d = modelSpan;
+  orbitCamera.position.set(
+    modelCenter.x + d * 1.4,
+    modelCenter.y + d * 1.2,
+    modelCenter.z + d * 1.4
+  );
+  orbitControls.target.copy(modelCenter);
+  activeCamera = orbitCamera;
+  orbitControls.object = activeCamera;
+  orbitControls.update();
+
+  if (cameraMode === 'ortho') syncOrthoCamera();
+}
+window.resetCamera = resetCamera;
+
+// ---------------------------------------------------------------------
+// Luces
+// ---------------------------------------------------------------------
+function initLights() {
+  sun = new THREE.DirectionalLight(0xffffff, 1);
+  sun.position.set(20, 40, 20);
+  sun.castShadow = true;
+  scene.add(sun);
+
+  const amb = new THREE.AmbientLight(0x888899, 0.4);
+  scene.add(amb);
+
+  const grid = new THREE.GridHelper(50, 50, 0x4b5563, 0x1f2937);
+  scene.add(grid);
+}
+
+function changeBackground(type) {
+  if (!scene) return;
+  if (type === 'black') {
+    scene.background = new THREE.Color(0x050608);
+    renderer.setClearColor(0x050608, 1);
+  } else if (type === 'grey') {
+    scene.background = new THREE.Color(0x111827);
+    renderer.setClearColor(0x111827, 1);
+  } else if (type === 'gradient') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0, '#020617');
+    grad.addColorStop(1, '#111827');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 2, 512);
+    const tex = new THREE.CanvasTexture(canvas);
+    scene.background = tex;
+    renderer.setClearColor(0x000000, 1);
   }
+}
 
-  function updateFirstPerson(dt) {
-    if (cameraMode !== 'walk' && cameraMode !== 'fly') return;
-
-    const cam = activeCamera;
-    if (!cam) return;
-
-    const speed = cameraMode === 'walk' ? modelSpan * 0.25 : modelSpan * 0.6;
-    const dampingFactor = Math.pow(damping, dt * 60);
-
-    const forward = new THREE.Vector3();
-    const right = new THREE.Vector3();
-    cam.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-    right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-    let move = new THREE.Vector3();
-
-    if (keys['KeyW']) move.add(forward);
-    if (keys['KeyS']) move.sub(forward);
-    if (keys['KeyA']) move.sub(right);
-    if (keys['KeyD']) move.add(right);
-
-    if (cameraMode === 'fly') {
-      if (keys['Space']) move.y += 1;
-      if (keys['ShiftLeft'] || keys['ShiftRight']) move.y -= 1;
-    }
-
-    if (move.lengthSq() > 0) {
-      move.normalize().multiplyScalar(speed * dt);
-      velocity.add(move);
-    }
-
-    velocity.multiplyScalar(dampingFactor);
-
-    const nextPos = cam.position.clone().add(velocity);
-    if (cameraMode === 'walk') {
-      const radius = modelSpan * 0.02;
-      if (!checkCollision(nextPos, radius)) {
-        const groundY = getGroundY(nextPos.x, nextPos.z);
-        nextPos.y = groundY + WALK_HEIGHT;
-        cam.position.copy(nextPos);
+function toggleShadows(enabled) {
+  if (!renderer || !sun) return;
+  renderer.shadowMap.enabled = enabled;
+  sun.castShadow = enabled;
+  if (modelGroup) {
+    modelGroup.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = enabled;
+        obj.receiveShadow = enabled;
       }
-    } else {
-      cam.position.copy(nextPos);
+    });
+  }
+}
+
+function updateSunFromUI() {
+  if (!sun) return;
+  const azEl = document.getElementById('sun-az');
+  const elEl = document.getElementById('sun-el');
+  if (!azEl || !elEl) return;
+
+  const az = parseFloat(azEl.value);
+  const el = parseFloat(elEl.value);
+
+  const phi = (90 - el) * (Math.PI / 180);
+  const theta = (az + 180) * (Math.PI / 180);
+  const dist = modelSpan * 2.5;
+
+  sun.position.set(
+    modelCenter.x + dist * Math.sin(phi) * Math.cos(theta),
+    modelCenter.y + dist * Math.cos(phi),
+    modelCenter.z + dist * Math.sin(phi) * Math.sin(theta)
+  );
+  sun.target.position.copy(modelCenter);
+  sun.target.updateMatrixWorld();
+}
+
+// ---------------------------------------------------------------------
+// content.json + carga IFC
+// ---------------------------------------------------------------------
+async function loadContentJson() {
+  const res = await fetch('/content.json', { cache: 'no-cache' });
+  if (!res.ok) throw new Error('No se pudo cargar content.json');
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error('content.json no es un array');
+  return data;
+}
+
+function getIdFromQuery() {
+  const p = new URLSearchParams(window.location.search);
+  return p.get('id') || null;
+}
+
+function buildModelUrl(archivo) {
+  if (/^https?:\/\//i.test(archivo)) return archivo;
+  if (archivo.startsWith('/models/')) return archivo;
+  if (archivo.startsWith('models/')) return '/' + archivo;
+  return '/models/' + archivo;
+}
+
+// Loader IFC
+const ifcLoader = new IFCLoader();
+ifcLoader.ifcManager.setWasmPath('/wasm/');
+
+// Overlay ayuda
+const helpOverlay = document.getElementById('help-overlay');
+const helpText = helpOverlay ? helpOverlay.querySelector('p') : null;
+if (helpText) helpText.textContent = 'Cargando modelo IFC...';
+
+// Panel colección
+const collPanel = document.getElementById('collection-panel');
+const collBody = document.getElementById('coll-body');
+const collToggle = document.getElementById('coll-toggle');
+if (collToggle && collPanel) {
+  collPanel.classList.add('collapsed');
+  collToggle.addEventListener('click', () => {
+    collPanel.classList.toggle('collapsed');
+  });
+}
+
+function fillCollectionPanel(items, currentId) {
+  if (!collBody) return;
+  collBody.innerHTML = '';
+
+  const current = items.find((it) => it.id === currentId);
+  const collId = current?.coleccion || current?.collection || null;
+  const filtered = collId
+    ? items.filter((it) => it.coleccion === collId || it.collection === collId)
+    : items;
+
+  filtered.forEach((it) => {
+    const a = document.createElement('a');
+    a.href = '?id=' + encodeURIComponent(it.id);
+    a.className = 'coll-item' + (it.id === currentId ? ' active' : '');
+    a.textContent = it.titulo || it.nombre || it.id;
+    collBody.appendChild(a);
+  });
+}
+
+// ---------------------------------------------------------------------
+// Panel capas IFC (solo lista, cortes ya están en HTML)
+// ---------------------------------------------------------------------
+function buildIfcLayersPanel() {
+  const list = document.getElementById('layers-list');
+  if (!list) return;
+
+  list.innerHTML = '';
+
+  if (ifcTypeToMeshes.size === 0) {
+    const span = document.createElement('span');
+    span.className = 'layers-empty';
+    span.textContent = 'No se encontraron tipos IFC en este modelo.';
+    list.appendChild(span);
+    return;
+  }
+
+  const entries = Array.from(ifcTypeToMeshes.keys()).sort((a, b) =>
+    a.localeCompare(b)
+  );
+
+  ifcVisibleTypes.clear();
+  for (const typeName of entries) ifcVisibleTypes.add(typeName);
+
+  for (const typeName of entries) {
+    const row = document.createElement('div');
+    row.className = 'layer-row';
+
+    const label = document.createElement('label');
+    label.textContent = typeName.replace('IFC', '');
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.checked = true;
+    chk.dataset.ifcType = typeName;
+
+    chk.addEventListener('change', () => {
+      if (chk.checked) ifcVisibleTypes.add(typeName);
+      else ifcVisibleTypes.delete(typeName);
+      updateIfcVisibility();
+    });
+
+    row.appendChild(label);
+    row.appendChild(chk);
+    list.appendChild(row);
+  }
+
+  updateIfcVisibility();
+}
+
+function updateIfcVisibility() {
+  if (!ifcModel) return;
+
+  ifcModel.traverse((obj) => {
+    if (obj.isMesh) obj.visible = false;
+  });
+
+  for (const [typeName, meshes] of ifcTypeToMeshes.entries()) {
+    const visible = ifcVisibleTypes.has(typeName);
+    if (!meshes) continue;
+    for (const mesh of meshes) {
+      mesh.visible = visible;
     }
   }
+}
 
-  function animate() {
-    requestAnimationFrame(animate);
-
-    const dt = 1 / 60;
-
-    if (orbitControls && (cameraMode === 'orbit' || cameraMode === 'ortho')) {
-      orbitControls.update();
+// ---------------------------------------------------------------------
+// Carga principal IFC + materiales + mapa tipos
+// ---------------------------------------------------------------------
+async function initIfcFromContent() {
+  try {
+    const id = getIdFromQuery();
+    if (!id) {
+      if (helpText)
+        helpText.textContent = 'No hay id en la URL (?id=...)';
+      return;
     }
 
-    updateFirstPerson(dt);
+    const items = await loadContentJson();
+    const item = items.find((it) => it.id === id);
 
-    renderer.render(scene, activeCamera);
-  }
-
-  // ── content.json y colecciones ─────────────────────────────────────
-  let currentItem = null;
-  let allItems = [];
-
-  async function loadContentJson() {
-    const res = await fetch('content.json', { cache: 'no-cache' });
-    if (!res.ok) throw new Error('No se pudo cargar content.json');
-    const data = await res.json();
-    if (!Array.isArray(data)) throw new Error('content.json no es un array');
-    allItems = data;
-  }
-
-  function findItemById(id) {
-    return allItems.find(it => it.id === id) || null;
-  }
-
-  function buildModelUrl(archivo) {
-    if (/^https?:\/\//i.test(archivo)) return archivo;
-    if (archivo.startsWith('models/')) return archivo;
-    return 'models/' + archivo;
-  }
-
-  function populateHeaderAndCollection() {
-    if (!currentItem) return;
+    if (!item) {
+      if (helpText)
+        helpText.textContent =
+          'Elemento no encontrado en content.json (id: ' + id + ')';
+      return;
+    }
 
     const titleEl = document.getElementById('model-title');
     if (titleEl) {
-      titleEl.textContent = currentItem.nombre || '(Sin nombre)';
+      titleEl.textContent = item.titulo || item.nombre || item.id;
     }
 
-    const breadcrumbs = document.getElementById('breadcrumbs');
-    if (breadcrumbs) {
-      const catLabel = currentItem.categoria === 'modelo-3d' ? 'Modelo BIM' : currentItem.categoria;
-      breadcrumbs.textContent = (currentItem.coleccion || 'Proyecto') + ' · ' + catLabel;
-    }
+    fillCollectionPanel(items, id);
 
-    const collNameEl = document.getElementById('collection-name');
-    if (collNameEl) {
-      collNameEl.textContent = currentItem.coleccion || 'Sin colección';
-    }
-
-    const relatedList = document.getElementById('related-list');
-    if (!relatedList) return;
-    relatedList.innerHTML = '';
-
-    if (!currentItem.coleccion) {
-      relatedList.textContent = 'Este elemento no pertenece a ninguna colección.';
-      return;
-    }
-
-    const others = allItems.filter(
-      it => it.coleccion === currentItem.coleccion && it.id !== currentItem.id
-    );
-
-    if (others.length === 0) {
-      relatedList.textContent = 'No hay otros elementos en esta colección.';
-      return;
-    }
-
-    others.forEach(it => {
-      const div = document.createElement('div');
-      div.className = 'related-item';
-
-      const a = document.createElement('a');
-      a.textContent = it.nombre || it.id;
-
-      const ext = String(it.archivo || '').split('.').pop().toLowerCase();
-
-      if (it.categoria === 'modelo-3d') {
-        if (ext === 'ifc') {
-          a.href = 'viewer-ifc.html?id=' + encodeURIComponent(it.id);
-        } else {
-          a.href = 'viewer.html?id=' + encodeURIComponent(it.id);
-        }
-      } else if (it.categoria === 'mapa') {
-        a.href = 'viewer-map.html?id=' + encodeURIComponent(it.id);
-      } else if (it.categoria === 'video') {
-        a.href = 'viewer-media.html?id=' + encodeURIComponent(it.id);
-      } else if (it.categoria === 'pdf') {
-        a.href = it.archivo;
-        a.target = '_blank';
-        a.rel = 'noopener';
-      } else if (it.categoria === 'enlace') {
-        a.href = it.archivo;
-        a.target = '_blank';
-        a.rel = 'noopener';
-      } else {
-        a.href = it.archivo || '#';
-      }
-
-      div.appendChild(a);
-      relatedList.appendChild(div);
-    });
-  }
-
-  // ── IFC loader ─────────────────────────────────────────────────────
-  let ifcLoader = null;
-
-  function initIfcLoader() {
-    if (!window.WebIFCThree || !WebIFCThree.IFCLoader) {
-      console.warn('web-ifc-three no está disponible. Revisa el <script> del CDN.');
-      return;
-    }
-
-    ifcLoader = new WebIFCThree.IFCLoader();
-
-    if (ifcLoader.ifcManager && ifcLoader.ifcManager.setWasmPath) {
-      // Aquí puedes seguir usando tus wasm locales
-      ifcLoader.ifcManager.setWasmPath('libs/ifc/');
-    }
-  }
-
-  function classifyIfcItemName(ifcType, rawName) {
-    const t = (ifcType || '').toUpperCase();
-    if (t.includes('WALL')) return 'Muros';
-    if (t.includes('SLAB')) return 'Losas';
-    if (t.includes('FLOOR')) return 'Pisos';
-    if (t.includes('ROOF')) return 'Cubiertas';
-    if (t.includes('WINDOW')) return 'Ventanas';
-    if (t.includes('DOOR')) return 'Puertas';
-    if (t.includes('COLUMN')) return 'Columnas';
-    if (t.includes('BEAM')) return 'Vigas';
-    if (t.includes('RAMP')) return 'Rampas';
-    if (t.includes('STAIR')) return 'Escaleras';
-    if (t.includes('SPACE')) return 'Espacios';
-    if (t.includes('SITE')) return 'Sitio';
-    if (t.includes('BUILDING')) return 'Edificio';
-    if (t.includes('STOREY')) return 'Niveles';
-    return rawName || t || 'Otros';
-  }
-
-  function classifyLayerForMaterials(layerName) {
-    const ln = (layerName || '').toLowerCase();
-    if (ln.includes('ventan')) return 'glass';
-    if (ln.includes('glass')) return 'glass';
-    if (ln.includes('losa') || ln.includes('piso') || ln.includes('slab')) return 'concrete';
-    if (ln.includes('muro') || ln.includes('wall')) return 'concrete';
-    if (ln.includes('cubierta') || ln.includes('roof')) return 'concrete';
-    if (ln.includes('terreno') || ln.includes('site') || ln.includes('terrain')) return 'terrain';
-    if (ln.includes('acero') || ln.includes('steel') || ln.includes('metal')) return 'steel';
-    return '';
-  }
-
-  function computeModelBoundsAndGround() {
-    if (!modelGroup) return;
-
-    const box = new THREE.Box3().setFromObject(modelGroup);
-    box.getSize(modelSize);
-    box.getCenter(modelCenter);
-    modelSpan = Math.max(modelSize.x, modelSize.y, modelSize.z) || 10;
-
-    groundMeshes = [];
-    modelGroup.traverse(obj => {
-      if (obj.isMesh) {
-        const name = (obj.name || '').toLowerCase();
-        if (name.includes('slab') || name.includes('floor') || name.includes('ground') || name.includes('terrain')) {
-          groundMeshes.push(obj);
-        }
-      }
-    });
-
-    if (groundMeshes.length === 0) {
-      modelGroup.traverse(obj => {
-        if (obj.isMesh) groundMeshes.push(obj);
-      });
-    }
-
-    resetCamera();
-    updateSun();
-  }
-
-  function attachMaterialsAndLayersToIfcGroup(ifcScene) {
-    if (modelGroup) {
-      scene.remove(modelGroup);
-    }
-    modelGroup = ifcScene;
-    scene.add(modelGroup);
-
-    layerMeshes = {};
-    const defaultColor = new THREE.Color(0xd1d5db);
-
-    modelGroup.traverse(obj => {
-      if (!obj.isMesh) return;
-
-      const baseColor = obj.material && obj.material.color
-        ? obj.material.color.getHex()
-        : defaultColor.getHex();
-
-      let layerName = obj.name || '';
-
-      const matLayerKey = classifyLayerForMaterials(layerName) || layerName.toLowerCase();
-
-      if (!meshMatCache[obj.uuid]) {
-        meshMatCache[obj.uuid] = buildMatSet(baseColor, matLayerKey);
-      }
-      obj.material = meshMatCache[obj.uuid][visualStyle];
-
-      if (!layerMeshes[layerName]) layerMeshes[layerName] = [];
-      layerMeshes[layerName].push(obj);
-
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-    });
-
-    updateLayersUI();
-    computeModelBoundsAndGround();
-  }
-
-  async function loadIfcModel(url) {
-    if (!ifcLoader) {
-      initIfcLoader();
-    }
-    if (!ifcLoader) {
-      throw new Error('No se pudo inicializar IFC Loader.');
-    }
-
-    showLoading('Cargando modelo IFC...', url);
-
-    let ifcScene;
-    try {
-      ifcScene = await ifcLoader.loadAsync(url);
-    } catch (err) {
-      console.error(err);
-      throw new Error('Error cargando IFC: ' + (err.message || err));
-    }
-
-    hideLoading();
-    attachMaterialsAndLayersToIfcGroup(ifcScene);
-  }
-
-  // ── Init ───────────────────────────────────────────────────────────
-  async function init() {
-    showLoading('Cargando modelo IFC...', 'Leyendo configuración');
-    initRendererAndCameras();
-
-    const id = getIdFromQuery();
-    if (!id) {
-      showLoading('Sin ID en la URL', 'Agrega ?id=algo en la dirección');
-      return;
-    }
-
-    try {
-      await loadContentJson();
-    } catch (err) {
-      console.error(err);
-      showLoading('Error leyendo content.json', err.message || 'Revisa la consola');
-      return;
-    }
-
-    currentItem = findItemById(id);
-    if (!currentItem) {
-      showLoading('Elemento no encontrado', 'ID: ' + id);
-      return;
-    }
-
-    populateHeaderAndCollection();
-
-    const archivo = currentItem.archivo || '';
+    const archivo = item.archivo || '';
     const ext = archivo.split('.').pop().toLowerCase();
     if (ext !== 'ifc') {
-      showLoading('El archivo no es IFC', 'Extensión: ' + ext);
+      if (helpText)
+        helpText.textContent =
+          'El archivo no es IFC (extensión: ' + ext + ')';
       return;
     }
 
-    const url = buildModelUrl(archivo);
+    const ifcUrl = buildModelUrl(archivo);
 
-    try {
-      await loadIfcModel(url);
-    } catch (err) {
-      console.error(err);
-      showLoading('Error cargando IFC', err.message || 'Revisa la consola');
+    ifcLoader.load(
+      ifcUrl,
+      async (model) => {
+        ifcModel = model;
+        modelGroup.add(ifcModel);
+
+        // cache materiales originales
+        ifcModel.traverse((obj) => {
+          if (!obj.isMesh) return;
+          const originalMat = obj.material;
+          const hex =
+            originalMat && originalMat.color && originalMat.color.getHex
+              ? originalMat.color.getHex()
+              : 0xcccccc;
+          const set = buildMatSet(hex, '');
+          set.rendered = originalMat;
+          meshMatCache[obj.uuid] = set;
+        });
+
+        // construir mapa tipo IFC -> meshes (si se puede)
+        ifcTypeToMeshes.clear();
+        const mgr = ifcLoader.ifcManager;
+        const modelID = ifcModel.modelID;
+
+        const meshes = [];
+        ifcModel.traverse((obj) => {
+          if (obj.isMesh && obj.geometry && obj.material) {
+            meshes.push(obj);
+          }
+        });
+
+        for (const mesh of meshes) {
+          let id;
+          try {
+            id = await mgr.getExpressId(mesh.geometry, mesh);
+          } catch (e) {
+            id = undefined;
+          }
+          if (id === undefined || id === null) continue;
+
+          let props;
+          try {
+            props = await mgr.getItemProperties(modelID, id, false);
+          } catch (e) {
+            continue;
+          }
+          if (!props || !props.type) continue;
+
+          const typeName = props.type;
+
+          if (!ifcTypeToMeshes.has(typeName)) {
+            ifcTypeToMeshes.set(typeName, []);
+          }
+          ifcTypeToMeshes.get(typeName).push(mesh);
+        }
+
+        const box = new THREE.Box3().setFromObject(ifcModel);
+        box.getSize(modelSize);
+        box.getCenter(modelCenter);
+        modelSpan = Math.max(modelSize.x, modelSize.y, modelSize.z) || 10;
+
+        setupClippingPlanes(box);
+
+        // sincronizar sliders
+                const cutBottom = document.getElementById('cut-bottom');
+        const cutTop = document.getElementById('cut-top');
+        const cutLeft = document.getElementById('cut-left');
+        const cutRight = document.getElementById('cut-right');
+        const cutFront = document.getElementById('cut-front');
+        const cutBack = document.getElementById('cut-back');
+        const cutEnabled = document.getElementById('cut-enabled');
+
+        if (cutBottom)
+          updateCutBottom(parseFloat(cutBottom.value || '0'));
+        if (cutTop) updateCutTop(parseFloat(cutTop.value || '0'));
+        if (cutLeft) updateCutLeft(parseFloat(cutLeft.value || '0'));
+        if (cutRight) updateCutRight(parseFloat(cutRight.value || '0'));
+        if (cutFront)
+          updateCutFront(parseFloat(cutFront.value || '0'));
+        if (cutBack) updateCutBack(parseFloat(cutBack.value || '0'));
+        updateClippingEnabled(cutEnabled ? cutEnabled.checked : true);
+
+
+        resetCamera();
+        updateSunFromUI();
+        buildIfcLayersPanel();
+
+        if (helpOverlay) helpOverlay.classList.remove('hidden');
+      },
+      undefined,
+      (err) => {
+        console.error('Error cargando IFC', err);
+        if (helpText)
+          helpText.textContent =
+            'Error cargando IFC. Revisa la consola.';
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    if (helpText)
+      helpText.textContent =
+        'Error leyendo content.json. Revisa la consola.';
+  }
+}
+
+// ---------------------------------------------------------------------
+// Controles UI
+// ---------------------------------------------------------------------
+function initUI() {
+  // botones de cámara
+  document.querySelectorAll('.cam-btn').forEach((btn) => {
+    const mode = btn.dataset.mode;
+    if (!mode) return;
+
+    if (btn.id === 'ortho-toggle') {
+      btn.addEventListener('click', () => toggleOrtho());
       return;
     }
+    if (mode === 'top') {
+      btn.addEventListener('click', () => setCameraMode('ortho'));
+      return;
+    }
+
+    btn.addEventListener('click', () => setCameraMode(mode));
+  });
+
+  // estilos
+  document.querySelectorAll('.style-btn').forEach((btn) => {
+    const style = btn.dataset.style;
+    btn.addEventListener('click', () => applyStyle(style));
+  });
+
+  // Panel capas / cortes
+  const layersPanel = document.getElementById('ifc-layers-panel');
+  const layersToggle = document.getElementById('layers-toggle');
+  if (layersPanel && layersToggle) {
+    layersPanel.classList.add('collapsed');
+    layersToggle.addEventListener('click', () => {
+      layersPanel.classList.toggle('collapsed');
+    });
   }
 
-  document.addEventListener('DOMContentLoaded', init);
-})();
+  // Reset / Volver
+  const resetBtn = document.getElementById('reset-btn');
+  if (resetBtn) resetBtn.addEventListener('click', resetCamera);
+
+  const backBtn = document.getElementById('back-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      window.location.href = '#volver';
+    });
+  }
+
+  // Panel fondo / luz / sombras
+  const bgSelect = document.getElementById('bg-select');
+  if (bgSelect) {
+    bgSelect.addEventListener('change', (e) =>
+      changeBackground(e.target.value)
+    );
+  }
+
+  const shToggle = document.getElementById('shadows-toggle');
+  if (shToggle) {
+    shToggle.addEventListener('change', (e) =>
+      toggleShadows(e.target.checked)
+    );
+  }
+
+  const azInput = document.getElementById('sun-az');
+  const elInput = document.getElementById('sun-el');
+  if (azInput) azInput.addEventListener('input', updateSunFromUI);
+  if (elInput) elInput.addEventListener('input', updateSunFromUI);
+
+  // Sliders de corte
+ const cutBottom = document.getElementById('cut-bottom');
+  const cutTop = document.getElementById('cut-top');
+  const cutLeft = document.getElementById('cut-left');
+  const cutRight = document.getElementById('cut-right');
+  const cutFront = document.getElementById('cut-front');
+  const cutBack = document.getElementById('cut-back');
+  const cutEnabled = document.getElementById('cut-enabled');
+
+  if (cutBottom) {
+    cutBottom.addEventListener('input', (e) =>
+      updateCutBottom(parseFloat(e.target.value))
+    );
+  }
+  if (cutTop) {
+    cutTop.addEventListener('input', (e) =>
+      updateCutTop(parseFloat(e.target.value))
+    );
+  }
+  if (cutLeft) {
+    cutLeft.addEventListener('input', (e) =>
+      updateCutLeft(parseFloat(e.target.value))
+    );
+  }
+  if (cutRight) {
+    cutRight.addEventListener('input', (e) =>
+      updateCutRight(parseFloat(e.target.value))
+    );
+  }
+  if (cutFront) {
+    cutFront.addEventListener('input', (e) =>
+      updateCutFront(parseFloat(e.target.value))
+    );
+  }
+  if (cutBack) {
+    cutBack.addEventListener('input', (e) =>
+      updateCutBack(parseFloat(e.target.value))
+    );
+  }
+  if (cutEnabled) {
+    cutEnabled.addEventListener('change', (e) =>
+      updateClippingEnabled(e.target.checked)
+    );
+  }
+
+  updateModeUI();
+}
+
+// ---------------------------------------------------------------------
+// Animación / resize / input
+// ---------------------------------------------------------------------
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  orbitCamera.aspect = w / h;
+  walkCamera.aspect = w / h;
+  flyCamera.aspect = w / h;
+
+  orbitCamera.updateProjectionMatrix();
+  walkCamera.updateProjectionMatrix();
+  flyCamera.updateProjectionMatrix();
+
+  renderer.setSize(w, h);
+});
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+});
+window.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+});
+
+function updateWalkFly(delta) {
+  if (cameraMode !== 'walk' && cameraMode !== 'fly') return;
+
+  const cam = activeCamera;
+  const speed = cameraMode === 'walk' ? 5 : 15;
+
+  const forward = new THREE.Vector3();
+  cam.getWorldDirection(forward);
+  forward.y = cameraMode === 'walk' ? 0 : forward.y;
+  forward.normalize();
+
+  const right = new THREE.Vector3().crossVectors(forward, cam.up).normalize();
+
+  if (keys['KeyW']) velocity.addScaledVector(forward, speed * delta);
+  if (keys['KeyS']) velocity.addScaledVector(forward, -speed * delta);
+  if (keys['KeyA']) velocity.addScaledVector(right, -speed * delta);
+  if (keys['KeyD']) velocity.addScaledVector(right, speed * delta);
+
+  if (cameraMode === 'fly') {
+    if (keys['Space']) velocity.y += speed * delta;
+    if (keys['ShiftLeft']) velocity.y -= speed * delta;
+  }
+
+  velocity.multiplyScalar(0.92);
+
+  const newPos = cam.position.clone().addScaledVector(velocity, delta);
+
+  if (cameraMode === 'walk') {
+    const groundY = getGroundY(newPos.x, newPos.z);
+    newPos.y = groundY + WALK_HEIGHT;
+  }
+
+  if (!checkCollision(newPos, 0.5)) {
+    cam.position.copy(newPos);
+  }
+}
+
+let lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const delta = (now - lastTime) / 1000;
+  lastTime = now;
+
+  orbitControls.update();
+  updateWalkFly(delta);
+
+  renderer.render(scene, activeCamera);
+}
+
+// ---------------------------------------------------------------------
+// Init general
+// ---------------------------------------------------------------------
+initCameras();
+initLights();
+initUI();
+initIfcFromContent();
+animate();
+
