@@ -1,0 +1,602 @@
+/* Layout base */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Canvas Three.js */
+canvas,
+#three-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Panel ayuda / overlay */
+.help-overlay {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.help-card {
+  width: 230px;
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  box-shadow: 0 18px 36px rgba(3, 7, 18, 0.92);
+  padding: 12px 14px;
+  pointer-events: auto;
+}
+
+.help-card h1 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #f9fafb;
+  font-weight: 600;
+}
+
+.help-card p {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.help-card ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.help-card li {
+  margin-bottom: 2px;
+}
+
+.help-overlay.hidden {
+  display: none;
+}
+
+/* ---------- BARRA SUPERIOR: TÍTULO + BOTONES ---------- */
+
+/* Franja superior que sirve de referencia para título */
+#top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+  z-index: 25;
+  pointer-events: none;
+}
+
+/* Título como chip centrado en la franja */
+#model-title {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #e5e7eb;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  box-shadow: 0 18px 36px rgba(3, 7, 18, 0.92);
+}
+
+/* Botones Volver / Resetear en la esquina superior derecha */
+.top-buttons {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+  z-index: 30;
+}
+
+.top-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(55, 65, 81, 0.95);
+  background: #020617;
+  color: #d1d5db;
+  font-size: 11px;
+  padding: 4px 12px;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(3, 7, 18, 0.9);
+}
+
+.top-btn:hover {
+  background: rgba(31, 41, 55, 0.98);
+}
+
+/* ---------- PANEL MODOS CÁMARA ---------- */
+
+.mode-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 999px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  z-index: 20;
+  box-shadow: 0 18px 36px rgba(3, 7, 18, 0.92);
+}
+
+#mode-label {
+  color: #9ca3af;
+  font-size: 11px;
+  padding-right: 4px;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.cam-btn {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #020617;
+  color: #9ca3af;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.cam-btn.active {
+  background: #4338ca;
+  color: #f9fafb;
+  border-color: #4f46e5;
+}
+
+.cam-btn:hover:not(.active) {
+  background: rgba(31, 41, 55, 0.98);
+}
+
+.ortho-toggle {
+  margin-left: 4px;
+}
+
+/* ---------- PANEL ESTILOS ---------- */
+
+.style-panel {
+  position: absolute;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 999px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  padding: 4px 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 20;
+  box-shadow: 0 18px 36px rgba(3, 7, 18, 0.92);
+}
+
+.style-btn {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #020617;
+  color: #9ca3af;
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.style-btn.active {
+  background: #4338ca;
+  color: #f9fafb;
+  border-color: #4f46e5;
+}
+
+.style-btn:hover:not(.active) {
+  background: rgba(31, 41, 55, 0.98);
+}
+
+/* ---------- PANEL VISIBILIDAD IFC ---------- */
+
+.layers-panel {
+  position: absolute;
+  top: 16px;
+  right: 160px;
+  width: 260px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+}
+
+.layers-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 999px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  font-size: 12px;
+  color: #e5e7eb;
+  box-shadow: 0 18px 36px rgba(3, 7, 18, 0.92);
+}
+
+#layers-toggle {
+  border: none;
+  background: #020617;
+  color: #9ca3af;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.layers-body {
+  margin-top: 6px;
+  padding: 6px 10px 8px;
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  font-size: 12px;
+  overflow-y: auto;
+  max-height: 60vh;
+  box-shadow: 0 18px 36px rgba(3, 7, 18, 0.92);
+}
+
+.layers-panel.collapsed .layers-body {
+  display: none;
+}
+
+/* Controles de corte */
+.section-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.section-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.section-row label {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.section-row input[type='range'] {
+  width: 100%;
+}
+
+.checkbox-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.layers-separator {
+  height: 1px;
+  background: rgba(31, 41, 55, 0.95);
+  margin: 6px 0;
+}
+
+/* Lista de capas */
+.layers-empty {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  padding: 4px 0;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.layer-row label {
+  color: #d1d5db;
+}
+
+.layer-row input[type='checkbox'] {
+  accent-color: #4f46e5;
+}
+
+/* ---------- PANEL COLECCIÓN + SOLAPA ---------- */
+
+/* Panel de colección, entra/sale desde la derecha */
+.collection-panel {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 260px;
+  max-height: 72vh;
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 12px 0 0 12px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  box-shadow: -12px 18px 36px rgba(3, 7, 18, 0.95);
+  z-index: 19;
+  display: flex;
+  flex-direction: column;
+}
+
+.collection-panel.collapsed {
+  right: -260px;
+}
+
+.collection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #e5e7eb;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.95);
+}
+
+.collection-body {
+  padding: 6px 10px 8px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+/* Solapa lateral independiente, siempre visible */
+#coll-toggle {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 120px;
+  border-radius: 12px 0 0 12px;
+  background: rgba(11, 15, 25, 0.96);
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  color: #60a5fa;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: -10px 10px 24px rgba(3, 7, 18, 0.95);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  z-index: 25;
+}
+
+/* Ítems de colección */
+.coll-item {
+  display: block;
+  padding: 4px 4px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #d1d5db;
+  font-size: 11px;
+}
+
+.coll-item:hover {
+  background: rgba(31, 41, 55, 0.95);
+}
+
+.coll-item.active {
+  background: rgba(79, 70, 229, 0.18);
+  color: #e5e7eb;
+}
+
+/* ---------- PANEL FONDO / LUZ / SOMBRAS ---------- */
+
+.env-panel {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 260px;
+  background: rgba(11, 15, 25, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(24, 31, 47, 0.98);
+  box-shadow: -12px 18px 36px rgba(3, 7, 18, 0.95);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  font-size: 12px;
+}
+
+.env-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.env-section label {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+/* Fondo */
+#bg-select {
+  background: #020617;
+  border-radius: 6px;
+  border: 1px solid rgba(55, 65, 81, 0.95);
+  color: #e5e7eb;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+/* Sliders */
+.env-section input[type='range'] {
+  width: 100%;
+}
+
+/* Sliders generales */
+input[type='range'] {
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: #1f2937;
+  outline: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #60a5fa;
+  border: 1px solid #93c5fd;
+  box-shadow: 0 0 0 2px rgba(3, 7, 18, 0.9);
+  cursor: pointer;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #60a5fa;
+  border: 1px solid #93c5fd;
+  box-shadow: 0 0 0 2px rgba(3, 7, 18, 0.9);
+  cursor: pointer;
+}
+
+/* Responsive básico */
+@media (max-width: 768px) {
+  .help-card {
+    width: 190px;
+  }
+
+  .layers-panel {
+    right: 120px;
+  }
+
+  .env-panel {
+    right: 8px;
+  }
+}
+/* ================== MODO MÓVIL ================== */
+@media (max-width: 768px) {
+  /* 0) Ocultar título en móvil */
+  #model-title {
+    display: none;
+  }
+
+  /* 1) Ocultar panel de instrucciones */
+  .help-overlay {
+    display: none;
+  }
+
+  /* 2) Mover Visibilidad IFC a la esquina sup. izq. */
+  .layers-panel {
+    top: 16px;
+    left: 16px;
+    right: auto;
+    width: 220px;
+  }
+
+    /* 3) Panel de fondo/luz estilo "chip" plegado */
+  .env-panel {
+    right: 16px;
+    bottom: 80px;
+    width: 210px;
+    padding: 4px 8px 8px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Estado plegado: solo se ve el "chip" */
+  .env-panel.compact .env-section:not(.env-toggle) {
+    display: none;
+  }
+
+  .env-panel.compact {
+    width: auto;
+    min-width: 120px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .env-toggle {
+    display: block;
+    font-size: 11px;
+    color: #e5e7eb;
+  }
+
+  /* Las secciones reales (fondo, sombras, sliders) */
+  .env-section:not(.env-toggle) {
+    display: flex;
+  }
+
+
+  /* 4) Botones inferiores más pequeños */
+  .mode-panel {
+    bottom: 8px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  .cam-btn {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .style-panel {
+    bottom: 36px;
+    padding: 3px 6px;
+  }
+
+  .style-btn {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+
+  /* 5) Ajuste botones superiores sin título */
+  #top-bar {
+    height: 40px;
+  }
+
+  .top-buttons {
+    top: 8px;
+    right: 10px;
+  }
+
+  .top-btn {
+    font-size: 10px;
+    padding: 3px 10px;
+  }
+
+  /* 6) Solapa de colección un poco más corta */
+  #coll-toggle {
+    height: 100px;
+  }
+}
