@@ -1,5 +1,5 @@
-// src/main.js
-import './style.css';
+// viewer-ifc.js (en la raíz del proyecto)
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { IFCLoader } from 'web-ifc-three/IFCLoader.js';
@@ -145,51 +145,44 @@ function applyStyle(style) {
 window.applyStyle = applyStyle;
 
 // ---------------------------------------------------------------------
-// Planos de corte (4)
+// Planos de corte
 // ---------------------------------------------------------------------
-let planeBottom = null; // desde abajo (Y min -> Y max)
-let planeTop = null; // desde arriba (Y max -> Y min)
-let planeLeft = null; // desde izquierda (X min -> X max)
-let planeRight = null; // desde derecha (X max -> X min)
-let planeFront = null; // nuevo: desde frente (Z min -> Z max)
-let planeBack = null;  // nuevo: desde fondo (Z max -> Z min)
+let planeBottom = null;
+let planeTop = null;
+let planeLeft = null;
+let planeRight = null;
+let planeFront = null;
+let planeBack = null;
 let clippingEnabled = true;
 
 function setupClippingPlanes(box) {
   const min = box.min;
   const max = box.max;
 
-  // Normales
   const up = new THREE.Vector3(0, 1, 0);
   const right = new THREE.Vector3(1, 0, 0);
   const forward = new THREE.Vector3(0, 0, 1);
 
-  // Bottom: normal (0,1,0), constant = -y
   planeBottom = new THREE.Plane(up.clone(), -min.y);
   planeBottom._minY = min.y;
   planeBottom._maxY = max.y;
 
-  // Top: normal (0,-1,0), constant = y
   planeTop = new THREE.Plane(up.clone().negate(), max.y);
   planeTop._minY = min.y;
   planeTop._maxY = max.y;
 
-  // Left: normal (1,0,0), constant = -x
   planeLeft = new THREE.Plane(right.clone(), -min.x);
   planeLeft._minX = min.x;
   planeLeft._maxX = max.x;
 
-  // Right: normal (-1,0,0), constant = x
   planeRight = new THREE.Plane(right.clone().negate(), max.x);
   planeRight._minX = min.x;
   planeRight._maxX = max.x;
 
-  // Front: normal (0,0,1), constant = -z
   planeFront = new THREE.Plane(forward.clone(), -min.z);
   planeFront._minZ = min.z;
   planeFront._maxZ = max.z;
 
-  // Back: normal (0,0,-1), constant = z
   planeBack = new THREE.Plane(forward.clone().negate(), max.z);
   planeBack._minZ = min.z;
   planeBack._maxZ = max.z;
@@ -254,8 +247,8 @@ function updateClippingEnabled(enabled) {
     if (planeTop) planes.push(planeTop);
     if (planeLeft) planes.push(planeLeft);
     if (planeRight) planes.push(planeRight);
-    if (planeFront) planes.push(planeFront); 
-    if (planeBack) planes.push(planeBack);   
+    if (planeFront) planes.push(planeFront);
+    if (planeBack) planes.push(planeBack);
     renderer.clippingPlanes = planes;
   } else {
     renderer.clippingPlanes = [];
@@ -288,7 +281,6 @@ function updateModeUI() {
     b.classList.toggle('active', b.dataset.mode === cameraMode);
   });
 }
-
 
 function getGroundY(x, z) {
   if (groundMeshes.length === 0) return modelCenter.y;
@@ -524,7 +516,7 @@ function updateSunFromUI() {
 // content.json + carga IFC
 // ---------------------------------------------------------------------
 async function loadContentJson() {
-  const res = await fetch('/../content.json', { cache: 'no-cache' });
+  const res = await fetch('content.json', { cache: 'no-cache' });
   if (!res.ok) throw new Error('No se pudo cargar content.json');
   const data = await res.json();
   if (!Array.isArray(data)) throw new Error('content.json no es un array');
@@ -538,9 +530,8 @@ function getIdFromQuery() {
 
 function buildModelUrl(archivo) {
   if (/^https?:\/\//i.test(archivo)) return archivo;
-  if (archivo.startsWith('/models/')) return archivo;
-  if (archivo.startsWith('models/')) return '/' + archivo;
-  return '/models/' + archivo;
+  // si viene como "models/demo.ifc" lo usamos tal cual
+  return archivo;
 }
 
 // Loader IFC
@@ -575,15 +566,15 @@ function fillCollectionPanel(items, currentId) {
 
   filtered.forEach((it) => {
     const a = document.createElement('a');
-    a.href = '?id=' + encodeURIComponent(it.id);
+    a.href = 'viewer-ifc.html?id=' + encodeURIComponent(it.id);
     a.className = 'coll-item' + (it.id === currentId ? ' active' : '');
-    a.textContent = it.titulo || it.nombre || it.id;
+    a.textContent = it.nombre || it.titulo || it.id;
     collBody.appendChild(a);
   });
 }
 
 // ---------------------------------------------------------------------
-// Panel capas IFC (solo lista, cortes ya están en HTML)
+// Panel capas IFC
 // ---------------------------------------------------------------------
 function buildIfcLayersPanel() {
   const list = document.getElementById('layers-list');
@@ -649,7 +640,7 @@ function updateIfcVisibility() {
 }
 
 // ---------------------------------------------------------------------
-// Carga principal IFC + materiales + mapa tipos
+// Carga principal IFC
 // ---------------------------------------------------------------------
 async function initIfcFromContent() {
   try {
@@ -672,7 +663,7 @@ async function initIfcFromContent() {
 
     const titleEl = document.getElementById('model-title');
     if (titleEl) {
-      titleEl.textContent = item.titulo || item.nombre || item.id;
+      titleEl.textContent = item.nombre || item.titulo || item.id;
     }
 
     fillCollectionPanel(items, id);
@@ -707,7 +698,7 @@ async function initIfcFromContent() {
           meshMatCache[obj.uuid] = set;
         });
 
-        // construir mapa tipo IFC -> meshes (si se puede)
+        // construir mapa tipo IFC -> meshes
         ifcTypeToMeshes.clear();
         const mgr = ifcLoader.ifcManager;
         const modelID = ifcModel.modelID;
@@ -720,17 +711,17 @@ async function initIfcFromContent() {
         });
 
         for (const mesh of meshes) {
-          let id;
+          let expId;
           try {
-            id = await mgr.getExpressId(mesh.geometry, mesh);
+            expId = await mgr.getExpressId(mesh.geometry, mesh);
           } catch (e) {
-            id = undefined;
+            expId = undefined;
           }
-          if (id === undefined || id === null) continue;
+          if (expId === undefined || expId === null) continue;
 
           let props;
           try {
-            props = await mgr.getItemProperties(modelID, id, false);
+            props = await mgr.getItemProperties(modelID, expId, false);
           } catch (e) {
             continue;
           }
@@ -752,7 +743,7 @@ async function initIfcFromContent() {
         setupClippingPlanes(box);
 
         // sincronizar sliders
-                const cutBottom = document.getElementById('cut-bottom');
+        const cutBottom = document.getElementById('cut-bottom');
         const cutTop = document.getElementById('cut-top');
         const cutLeft = document.getElementById('cut-left');
         const cutRight = document.getElementById('cut-right');
@@ -769,7 +760,6 @@ async function initIfcFromContent() {
           updateCutFront(parseFloat(cutFront.value || '0'));
         if (cutBack) updateCutBack(parseFloat(cutBack.value || '0'));
         updateClippingEnabled(cutEnabled ? cutEnabled.checked : true);
-
 
         resetCamera();
         updateSunFromUI();
@@ -820,7 +810,7 @@ function initUI() {
     btn.addEventListener('click', () => applyStyle(style));
   });
 
-  // Panel capas / cortes
+  // Panel capas
   const layersPanel = document.getElementById('ifc-layers-panel');
   const layersToggle = document.getElementById('layers-toggle');
   if (layersPanel && layersToggle) {
@@ -862,7 +852,7 @@ function initUI() {
   if (elInput) elInput.addEventListener('input', updateSunFromUI);
 
   // Sliders de corte
- const cutBottom = document.getElementById('cut-bottom');
+  const cutBottom = document.getElementById('cut-bottom');
   const cutTop = document.getElementById('cut-top');
   const cutLeft = document.getElementById('cut-left');
   const cutRight = document.getElementById('cut-right');
@@ -992,4 +982,3 @@ initLights();
 initUI();
 initIfcFromContent();
 animate();
-
