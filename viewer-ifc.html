@@ -5,10 +5,17 @@
     <title>ArchVista IFC</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style-ifc.css" />
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
+        "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="app">
-      <!-- Canvas Three.js se inyecta desde viewer-ifc.js -->
       <canvas id="three-canvas"></canvas>
 
       <!-- Panel ayuda / overlay -->
@@ -31,7 +38,7 @@
         </div>
       </div>
 
-      <!-- Barra superior: título + botones -->
+      <!-- Barra superior: titulo + botones -->
       <div id="top-bar">
         <div id="model-title" class="model-title">Modelo IFC</div>
         <div class="top-buttons">
@@ -44,42 +51,34 @@
       <div id="ifc-layers-panel" class="layers-panel collapsed">
         <div class="layers-header">
           <span>Visibilidad IFC</span>
-          <button id="layers-toggle">▤</button>
+          <button id="layers-toggle">&#x25A4;</button>
         </div>
-
         <div class="layers-body" id="layers-body">
-          <!-- Controles de corte -->
           <div class="section-controls">
             <div class="section-row">
               <label for="cut-bottom">Corte desde abajo</label>
               <input id="cut-bottom" type="range" min="0" max="100" value="0" />
             </div>
-
             <div class="section-row">
               <label for="cut-top">Corte desde arriba</label>
               <input id="cut-top" type="range" min="0" max="100" value="0" />
             </div>
-
             <div class="section-row">
               <label for="cut-left">Corte desde izquierda</label>
               <input id="cut-left" type="range" min="0" max="100" value="0" />
             </div>
-
             <div class="section-row">
               <label for="cut-right">Corte desde derecha</label>
               <input id="cut-right" type="range" min="0" max="100" value="0" />
             </div>
-
             <div class="section-row">
               <label for="cut-front">Corte desde frente</label>
               <input id="cut-front" type="range" min="0" max="100" value="0" />
             </div>
-
             <div class="section-row">
               <label for="cut-back">Corte desde fondo</label>
               <input id="cut-back" type="range" min="0" max="100" value="0" />
             </div>
-
             <div class="section-row checkbox-row">
               <label>
                 <input type="checkbox" id="cut-enabled" checked />
@@ -87,34 +86,27 @@
               </label>
             </div>
           </div>
-
           <div class="layers-separator"></div>
-
-          <!-- Lista de capas IFC (placeholder) -->
           <div id="layers-list">
-            <span class="layers-empty">
-              Capas IFC en desarrollo…
-            </span>
+            <span class="layers-empty">Capas IFC en desarrollo...</span>
           </div>
         </div>
       </div>
 
-      <!-- Panel colección (lista de modelos) -->
+      <!-- Panel coleccion -->
       <div id="collection-panel" class="collection-panel collapsed">
         <div class="collection-header">
-          <span>Colección</span>
+          <span>Coleccion</span>
         </div>
         <div id="coll-body" class="collection-body"></div>
       </div>
-      <!-- Solapa lateral -->
-      <button id="coll-toggle">COLECCIÓN</button>
+      <button id="coll-toggle">COLECCION</button>
 
       <!-- Panel fondo / luz / sombras -->
-      <div id="env-panel" class="env-panel compact">
+      <div id="env-panel" class="env-panel">
         <div class="env-section env-toggle">
           <span>Fondo / Luz</span>
         </div>
-
         <div class="env-section">
           <label for="bg-select">Fondo</label>
           <select id="bg-select">
@@ -123,26 +115,23 @@
             <option value="gradient" selected>Gradiente</option>
           </select>
         </div>
-
         <div class="env-section">
           <label>
             <input type="checkbox" id="shadows-toggle" checked />
             Sombras
           </label>
         </div>
-
         <div class="env-section small">
           <label for="sun-az">Dir. solar</label>
           <input id="sun-az" type="range" min="0" max="360" value="220" />
         </div>
-
         <div class="env-section small">
           <label for="sun-el">Elev. solar</label>
           <input id="sun-el" type="range" min="5" max="80" value="35" />
         </div>
       </div>
 
-      <!-- Panel estilos y modos cámara -->
+      <!-- Panel estilos -->
       <div id="style-panel" class="style-panel">
         <button class="style-btn active" data-style="rendered">Render</button>
         <button class="style-btn" data-style="clay">Arcilla</button>
@@ -150,6 +139,7 @@
         <button class="style-btn" data-style="xray">Rayos X</button>
       </div>
 
+      <!-- Panel modos camara -->
       <div id="mode-panel" class="mode-panel">
         <span id="mode-label">Orbit</span>
         <div class="mode-buttons">
@@ -157,9 +147,7 @@
           <button class="cam-btn" data-mode="walk">2. Walk</button>
           <button class="cam-btn" data-mode="fly">3. Vuelo</button>
           <button class="cam-btn" data-mode="top">4. Vista superior</button>
-          <button id="ortho-toggle" class="cam-btn ortho-toggle">
-            Ortho
-          </button>
+          <button id="ortho-toggle" class="cam-btn ortho-toggle">Ortho</button>
         </div>
       </div>
     </div>
@@ -167,4 +155,3 @@
     <script type="module" src="viewer-ifc.js"></script>
   </body>
 </html>
-
