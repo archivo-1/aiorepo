@@ -536,7 +536,7 @@ function buildModelUrl(archivo) {
 
 // Loader IFC
 const ifcLoader = new IFCLoader();
-ifcLoader.ifcManager.setWasmPath('/wasm/');
+ifcLoader.ifcManager.setWasmPath('libs/ifc/');
 
 // Overlay ayuda
 const helpOverlay = document.getElementById('help-overlay');
