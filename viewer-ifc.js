@@ -1,8 +1,8 @@
 // viewer-ifc.js (en la raíz del proyecto)
 
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { IFCLoader } from 'web-ifc-three/IFCLoader.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import { IFCLoader } from 'https://cdn.jsdelivr.net/npm/web-ifc-three@0.0.122/IFCLoader.js';
 
 // ---------------------------------------------------------------------
 // Escena básica
