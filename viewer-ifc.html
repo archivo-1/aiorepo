@@ -109,31 +109,33 @@
 
 
       <!-- Panel fondo / luz / sombras -->
-      <div id="env-panel" class="env-panel">
-        <div class="env-section env-toggle">
-          <span>Fondo / Luz</span>
-        </div>
-        <div class="env-section">
-          <label for="bg-select">Fondo</label>
-          <select id="bg-select">
-            <option value="black">Negro</option>
-            <option value="grey">Gris</option>
-            <option value="gradient" selected>Gradiente</option>
-          </select>
-        </div>
-        <div class="env-section">
-          <label>
-            <input type="checkbox" id="shadows-toggle" checked />
-            Sombras
-          </label>
-        </div>
-        <div class="env-section small">
-          <label for="sun-az">Dir. solar</label>
-          <input id="sun-az" type="range" min="0" max="360" value="220" />
-        </div>
-        <div class="env-section small">
-          <label for="sun-el">Elev. solar</label>
-          <input id="sun-el" type="range" min="5" max="80" value="35" />
+       <div id="side-controls">
+        <div id="env-panel" class="env-panel">
+          <div class="env-section env-toggle">
+            <span>Fondo / Luz</span>
+          </div>
+          <div class="env-section">
+            <label for="bg-select">Fondo</label>
+            <select id="bg-select">
+              <option value="black">Negro</option>
+              <option value="grey">Gris</option>
+              <option value="gradient" selected>Gradiente</option>
+            </select>
+          </div>
+          <div class="env-section">
+            <label>
+              <input type="checkbox" id="shadows-toggle" checked />
+              Sombras
+            </label>
+          </div>
+          <div class="env-section small">
+            <label for="sun-az">Dir. solar</label>
+            <input id="sun-az" type="range" min="0" max="360" value="220" />
+          </div>
+          <div class="env-section small">
+            <label for="sun-el">Elev. solar</label>
+            <input id="sun-el" type="range" min="5" max="80" value="35" />
+          </div>
         </div>
       </div>
 
