@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ArchVista - Visor Multimedia</title>
+    <title>Aio Archivo-1 - Visor de media</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <style>
         :root { --accent: #00f2ff; --bg: #050608; --panel: #0d1117; --header-h: 52px; }
@@ -89,6 +89,8 @@
             height: calc(100vh - var(--header-h));
             overflow: auto;
             -webkit-overflow-scrolling: touch;
+            position: relative; /* NUEVO: Define contexto de apilamiento para que respete el z-index de la solapa */
+            z-index: 1; 
         }
         iframe { width: 100%; height: 100%; border: none; display: block; }
 
@@ -103,9 +105,12 @@
 
         /* ── SOLAPA COLECCIÓN (Fija) ── */
         .collection-nav-container { 
-            position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-            z-index: 1100; display: flex; align-items: center;
+            position: fixed; top: 50%; right: 0; 
+            transform: translateY(-50%) translateZ(10px); /* NUEVO: Fuerza la capa 3D sobre el iframe */
+            z-index: 9999; /* Aumentado */
+            display: flex; align-items: center;
             touch-action: none;
+            pointer-events: auto; /* NUEVO: Asegura que registre clicks */
         }
         
         .coll-side-tab {
@@ -284,17 +289,47 @@
             const itemList = document.getElementById('collItemList');
             
             itemList.innerHTML = siblings.map(i => {
-                let url = i.categoria === 'modelo-3d' ? `viewer.html?file=models/${i.archivo}` : 
-                          (i.categoria === 'mapa' ? `viewer-map.html?id=${i.id}` : `viewer-media.html?id=${i.id}`);
+                const archivo = String(i.archivo || '');
+                const ext = archivo.split('.').pop().toLowerCase();
+                let url;
+
+                if (i.categoria === 'modelo-3d') {
+                    if (ext === 'ifc') {
+                        url = `viewer-ifc.html?id=${i.id}`;
+                    } else {
+                        url = `viewer.html?file=models/${i.archivo}`;
+                    }
+                } else if (i.categoria === 'mapa') {
+                    url = `viewer-map.html?id=${i.id}`;
+                } else {
+                    url = `viewer-media.html?id=${i.id}`;
+                }
+
                 return `<a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">${i.nombre}</a>`;
             }).join('');
 
+            // MODIFICACIÓN: Solución para que el panel pueda cerrarse al hacer clic fuera, incluso sobre el iframe
             document.getElementById('collTab').onclick = (e) => {
                 e.stopPropagation();
-                container.classList.toggle('open');
+                const isOpen = container.classList.toggle('open');
+                
+                // Desactiva los eventos del iframe cuando el menú está abierto
+                const iframe = document.querySelector('.iframe-container iframe');
+                if (iframe) {
+                    iframe.style.pointerEvents = isOpen ? 'none' : 'auto';
+                }
             };
+            
             document.addEventListener('pointerdown', e => {
-                if (!container.contains(e.target)) container.classList.remove('open');
+                if (!container.contains(e.target)) {
+                    container.classList.remove('open');
+                    
+                    // Restaura los eventos del iframe al cerrar el menú
+                    const iframe = document.querySelector('.iframe-container iframe');
+                    if (iframe) {
+                        iframe.style.pointerEvents = 'auto';
+                    }
+                }
             });
         }
 
