@@ -128,7 +128,8 @@
       "showLayers": true,
       "showLighting": true,
       "showShadows": true
-    },
+    }
+  },
   {
     "id": "IFC_DEMO02",
     "nombre": "Modelo BIM(.ifc) de prueba 2",
