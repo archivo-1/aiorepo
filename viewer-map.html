@@ -317,11 +317,30 @@
             container.style.display = 'flex';
             const itemList = document.getElementById('collItemList');
             
-            itemList.innerHTML = siblings.map(i => {
-                let url = i.categoria === 'modelo-3d' ? `viewer.html?file=models/${i.archivo}` : 
-                          (i.categoria === 'mapa' ? `viewer-map.html?id=${i.id}` : `viewer-media.html?id=${i.id}`);
-                return `<a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">${i.nombre}</a>`;
-            }).join('');
+              itemList.innerHTML = siblings
+            .map((i) => {
+            let url = '';
+            const archivo = String(i.archivo || '');
+            const ext = archivo.split('.').pop().toLowerCase();
+
+            if (i.categoria === 'mapa') {
+                url = `viewer-map.html?id=${i.id}`;
+            } else if (i.categoria === 'modelo-3d') {
+                if (ext === 'ifc') {
+                url = `viewer-ifc.html?id=${i.id}`;
+                } else {
+                url = `viewer.html?file=models/${i.archivo}`;
+                }
+            } else {
+                url = `viewer-media.html?id=${i.id}`;
+            }
+
+            return `<a href="${url}" class="coll-item ${
+                i.id === currentItem.id ? 'active' : ''
+            }">${i.nombre || i.titulo || i.id}</a>`;
+            })
+            .join('');
+
 
             document.getElementById('collTab').onclick = (e) => {
                 e.stopPropagation();
