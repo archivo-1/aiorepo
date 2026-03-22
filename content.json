@@ -7,7 +7,7 @@
     "categoria": "pdf",
     "coleccion": "Colección 1",
     "tamano": "Especificar tamaño de archivo",
-    "thumbnail": "thumbnails/pdfthumb.png"
+    "thumbnail": "thumbnails/gt_pdf.png"
   },
   {
     "id": "PDF_DEMO02",
@@ -17,7 +17,7 @@
     "categoria": "pdf",
     "coleccion": "Colección 2",
     "tamano": "Especificar tamaño de archivo",
-    "thumbnail": "thumbnails/pdfthumb.png"
+    "thumbnail": "thumbnails/gt_pdf.png"
   },
   {
     "id": "HTML_DEMO01",
@@ -27,7 +27,7 @@
     "categoria": "enlace",
     "tamano": "Especificar el enlace",
     "coleccion": "Colección 1",
-    "thumbnail": "thumbnails/webexthumb.png"
+    "thumbnail": "thumbnails/gt_WEB.png"
   },
   {
     "id": "HTML_DEMO02",
@@ -37,7 +37,7 @@
     "categoria": "enlace",
     "tamano": "Especificar el enlace",
     "coleccion": "Colección 2",
-    "thumbnail": "thumbnails/webexthumb.png"
+    "thumbnail": "thumbnails/gt_WEB.png"
   },
   {
     "id": "GEOJSON_DEMO01",
@@ -47,7 +47,7 @@
     "categoria": "mapa",
     "tamano": "vía OpenStreetMap",
     "coleccion": "Colección 1",
-    "thumbnail": "thumbnails/mapsthumb.png"
+    "thumbnail": "thumbnails/gt_geojson.png"
   },
   {
     "id": "GEOJSON_DEMO02",
@@ -57,7 +57,7 @@
     "categoria": "mapa",
     "tamano": "vía OpenStreetMap",
     "coleccion": "Colección 2",
-    "thumbnail": "thumbnails/mapsthumb.png"
+    "thumbnail": "thumbnails/gt_geojson.png"
   },
   {
     "id": "WEBM_DEMO01",
@@ -67,7 +67,7 @@
     "categoria": "video",
     "tamano": "11 MB",
     "coleccion": "Colección 1",
-    "thumbnail": "thumbnails/vid01.png"
+    "thumbnail": "thumbnails/gt_webm.png"
   },
   {
     "id": "MP4_DEMO01",
@@ -77,7 +77,7 @@
     "categoria": "video",
     "tamano": "Especificar tamaño de archivo",
     "coleccion": "Colección 2",
-    "thumbnail": "thumbnails/vid02.png"
+    "thumbnail": "thumbnails/gt_mp4.png"
   },
   {
     "id": "3DM_DEMO01",
@@ -87,7 +87,7 @@
     "categoria": "modelo-3d",
     "tamano": "Especificar tamaño de archivo",
     "coleccion": "Colección 1",
-    "thumbnail": "thumbnails/3dthumb.png",
+    "thumbnail": "thumbnails/gt_3dm.png",
     "uiConfig": {
       "cameraModes": ["orbit","ortho","fly"],
       "visualStyles": ["rendered", "clay","xray"],
@@ -104,7 +104,7 @@
     "categoria": "modelo-3d",
     "tamano": "Especificar tamaño de archivo",
     "coleccion": "Colección 2",
-    "thumbnail": "thumbnails/3dthumb.png",
+    "thumbnail": "thumbnails/gt_3dm.png",
     "uiConfig": {
       "cameraModes": [],
       "visualStyles": ["xray"],
@@ -115,13 +115,13 @@
   },
   {
     "id": "IFC_DEMO01",
-    "nombre": "Modelo BIM(.ifc) de prueba",
+    "nombre": "Modelo BIM(.ifc) de prueba 1",
     "archivo": "models/demo.ifc",
     "descripcion": "Archivo BIM exportado de Revit a .ifc de ejemplo, indexado para probar VisorBIM",
     "categoria": "modelo-3d",
     "tamano": "Especificar tamaño de archivo",
     "coleccion": "Colección 1",
-    "thumbnail": "thumbnails/3dthumb.png",
+    "thumbnail": "thumbnails/gt_ifc.png",
     "uiConfig": {
       "cameraModes": ["orbit", "ortho", "walk", "fly"],
       "visualStyles": ["rendered", "clay", "xray", "wireframe"],
@@ -138,7 +138,7 @@
     "categoria": "modelo-3d",
     "tamano": "Especificar tamaño de archivo",
     "coleccion": "Colección 2",
-    "thumbnail": "thumbnails/3dthumb.png",
+    "thumbnail": "thumbnails/gt_ifc.png",
     "uiConfig": {
       "cameraModes": ["orbit", "ortho", "walk", "fly"],
       "visualStyles": ["rendered", "clay", "xray", "wireframe"],
