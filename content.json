@@ -131,7 +131,7 @@
     },
   {
     "id": "IFC_DEMO02",
-    "nombre": "Modelo BIM(.ifc) de prueba",
+    "nombre": "Modelo BIM(.ifc) de prueba 2",
     "archivo": "models/demo2.ifc",
     "descripcion": "Archivo BIM exportado de Revit a .ifc de ejemplo, indexado para probar VisorBIM",
     "categoria": "modelo-3d",
