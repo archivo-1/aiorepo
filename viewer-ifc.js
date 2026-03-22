@@ -56,8 +56,23 @@ let sun;
 // ---------------------------------------------------------------------
 let visualStyle = 'rendered';
 const meshMatCache = {};
-const ifcTypeToMeshes = new Map();
-const ifcVisibleTypes = new Set();
+
+// NOTA IMPORTANTE (IFC por tipos):
+// --------------------------------
+// La idea de tener "Visibilidad IFC" por tipos (IFCWALL, IFCDOOR, etc.)
+// requiere mapear cada mesh a un tipo usando ifcManager.getExpressId()
+// y getItemProperties(). En este proyecto, esa API no está devolviendo
+// props.type de forma utilizable con los modelos actuales, por lo que
+// la funcionalidad de capas por tipo queda en pausa.
+//
+// Mantenemos la estructura aquí para que un desarrollador humano
+// pueda retomarla en el futuro:
+//
+//   - Mapa: nombreTipoIFC (string, p.ej. "IFCWALL") -> array de meshes
+//   - Conjunto: tipos visibles actualmente
+//
+// const ifcTypeToMeshes = new Map();
+// const ifcVisibleTypes = new Set();
 
 const LAYER_OVERRIDES = {
   glass: {
@@ -533,8 +548,7 @@ function buildModelUrl(archivo) {
 
 // Loader IFC
 const ifcLoader = new IFCLoader();
-// IMPORTANTE: ruta relativa al HTML que sirve viewer-ifc.html
-// Asegúrate de que en tu repo exista /libs/ifc/ con los .wasm adecuados
+// Usamos el wasm desde unpkg para que coincida con web-ifc 0.0.56
 ifcLoader.ifcManager.setWasmPath('https://unpkg.com/web-ifc@0.0.56/');
 
 // Overlay ayuda
@@ -542,38 +556,64 @@ const helpOverlay = document.getElementById('help-overlay');
 const helpText = helpOverlay ? helpOverlay.querySelector('p') : null;
 if (helpText) helpText.textContent = 'Cargando modelo IFC...';
 
-// Panel colección
-const collPanel = document.getElementById('collection-panel');
-const collBody = document.getElementById('coll-body');
-const collToggle = document.getElementById('coll-toggle');
-if (collToggle && collPanel) {
-  collPanel.classList.add('collapsed');
-  collToggle.addEventListener('click', () => {
-    collPanel.classList.toggle('collapsed');
+// Panel colección – versión unificada con 3DM / media
+function setupCollectionSideNav(allData, currentItem) {
+  const collName = currentItem.coleccion || currentItem.collection;
+  if (!collName) return;
+
+  const siblings = allData.filter(
+    (i) => i.coleccion === collName || i.collection === collName
+  );
+  if (siblings.length <= 1) return;
+
+  const container = document.getElementById('collection-nav');
+  if (!container) return;
+
+  container.style.display = 'flex';
+  const nameLabel = document.getElementById('collNameLabel');
+  if (nameLabel) nameLabel.textContent = collName;
+
+  const itemList = document.getElementById('collItemList');
+  if (!itemList) return;
+
+  itemList.innerHTML = siblings
+    .map((i) => {
+      let url = '';
+      if (i.categoria === 'modelo-3d') {
+        // Visor 3DM
+        url = `viewer.html?file=models/${i.archivo}`;
+      } else if (i.categoria === 'mapa') {
+        // Visor mapas
+        url = `viewer-map.html?id=${i.id}`;
+      } else if (i.categoria === 'ifc') {
+        // Visor IFC
+        url = `viewer-ifc.html?id=${i.id}`;
+      } else {
+        // Resto: visor multimedia
+        url = `viewer-media.html?id=${i.id}`;
+      }
+      return `<a href="${url}" class="coll-item ${
+        i.id === currentItem.id ? 'active' : ''
+      }">${i.nombre || i.titulo || i.id}</a>`;
+    })
+    .join('');
+
+  const tab = document.getElementById('collTab');
+  tab?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    container.classList.toggle('open');
+  });
+
+  document.addEventListener('pointerdown', (e) => {
+    if (!container.contains(e.target) && container.classList.contains('open')) {
+      container.classList.remove('open');
+    }
   });
 }
 
-function fillCollectionPanel(items, currentId) {
-  if (!collBody) return;
-  collBody.innerHTML = '';
-
-  const current = items.find((it) => it.id === currentId);
-  const collId = current?.coleccion || current?.collection || null;
-  const filtered = collId
-    ? items.filter((it) => it.coleccion === collId || it.collection === collId)
-    : items;
-
-  filtered.forEach((it) => {
-    const a = document.createElement('a');
-    a.href = 'viewer-ifc.html?id=' + encodeURIComponent(it.id);
-    a.className = 'coll-item' + (it.id === currentId ? ' active' : '');
-    a.textContent = it.nombre || it.titulo || it.id;
-    collBody.appendChild(a);
-  });
-}
 
 // ---------------------------------------------------------------------
-// Panel capas IFC
+// Panel capas IFC (estado actual)
 // ---------------------------------------------------------------------
 function buildIfcLayersPanel() {
   const list = document.getElementById('layers-list');
@@ -581,62 +621,137 @@ function buildIfcLayersPanel() {
 
   list.innerHTML = '';
 
-  if (ifcTypeToMeshes.size === 0) {
-    const span = document.createElement('span');
-    span.className = 'layers-empty';
-    span.textContent = 'No se encontraron tipos IFC en este modelo.';
-    list.appendChild(span);
-    return;
-  }
-
-  const entries = Array.from(ifcTypeToMeshes.keys()).sort((a, b) =>
-    a.localeCompare(b)
-  );
-
-  ifcVisibleTypes.clear();
-  for (const typeName of entries) ifcVisibleTypes.add(typeName);
-
-  for (const typeName of entries) {
-    const row = document.createElement('div');
-    row.className = 'layer-row';
-
-    const label = document.createElement('label');
-    label.textContent = typeName.replace('IFC', '');
-
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.checked = true;
-    chk.dataset.ifcType = typeName;
-
-    chk.addEventListener('change', () => {
-      if (chk.checked) ifcVisibleTypes.add(typeName);
-      else ifcVisibleTypes.delete(typeName);
-      updateIfcVisibility();
-    });
-
-    row.appendChild(label);
-    row.appendChild(chk);
-    list.appendChild(row);
-  }
-
-  updateIfcVisibility();
+  // Estado actual honesto: sin datos fiables de tipos IFC
+  const span = document.createElement('span');
+  span.className = 'layers-empty';
+  span.textContent =
+    'Control por tipos IFC en desarrollo. Use los cortes para explorar el interior.';
+  list.appendChild(span);
 }
 
-function updateIfcVisibility() {
-  if (!ifcModel) return;
+// ---------------------------------------------------------------------
+// (DOCUMENTACIÓN PARA DESARROLLADORES HUMANOS)
+//
+// Intento de mapeo por tipos IFC y próximos pasos sugeridos:
+//
+// 1) Recorrer todas las mallas de ifcModel.
+// 2) Para cada mesh, obtener su expressId:
+//      const expId = await ifcLoader.ifcManager.getExpressId(mesh.geometry, mesh);
+// 3) Obtener sus propiedades:
+//      const props = await ifcLoader.ifcManager.getItemProperties(modelID, expId, false);
+// 4) props.type suele ser algo como "IFCWALL", "IFCDOOR", etc. en builds donde
+//    esto está soportado. En este proyecto, props.type no se ha podido usar.
+// 5) La idea era poblar ifcTypeToMeshes y luego construir checkboxes por tipo.
+//
+// Código de referencia (NO se ejecuta ahora):
+//
+//   const ifcTypeToMeshes = new Map();
+//   const ifcVisibleTypes = new Set();
+//
+//   function buildIfcLayersPanelExperimental() {
+//     const list = document.getElementById('layers-list');
+//     if (!list) return;
+//     list.innerHTML = '';
+//
+//     if (ifcTypeToMeshes.size === 0) {
+//       const span = document.createElement('span');
+//       span.className = 'layers-empty';
+//       span.textContent = 'No se encontraron tipos IFC en este modelo.';
+//       list.appendChild(span);
+//       return;
+//     }
+//
+//     const entries = Array.from(ifcTypeToMeshes.keys()).sort((a, b) =>
+//       a.localeCompare(b)
+//     );
+//
+//     ifcVisibleTypes.clear();
+//     for (const typeName of entries) ifcVisibleTypes.add(typeName);
+//
+//     for (const typeName of entries) {
+//       const row = document.createElement('div');
+//       row.className = 'layer-row';
+//
+//       const label = document.createElement('label');
+//       label.textContent = typeName; // p.ej. "IFCWALL"
+//
+//       const chk = document.createElement('input');
+//       chk.type = 'checkbox';
+//       chk.checked = true;
+//       chk.dataset.ifcType = typeName;
+//
+//       chk.addEventListener('change', () => {
+//         if (chk.checked) ifcVisibleTypes.add(typeName);
+//         else ifcVisibleTypes.delete(typeName);
+//         updateIfcVisibilityExperimental();
+//       });
+//
+//       row.appendChild(label);
+//       row.appendChild(chk);
+//       list.appendChild(row);
+//     }
+//
+//     updateIfcVisibilityExperimental();
+//   }
+//
+//   function updateIfcVisibilityExperimental() {
+//     if (!ifcModel) return;
+//     ifcModel.traverse((obj) => {
+//       if (obj.isMesh) obj.visible = false;
+//   });
+//     for (const [typeName, meshes] of ifcTypeToMeshes.entries()) {
+//       const visible = ifcVisibleTypes.has(typeName);
+//       if (!meshes) continue;
+//       for (const mesh of meshes) mesh.visible = visible;
+//     }
+//   }
+//
+//   // Llenado experimental dentro de initIfcFromContent():
+//   //
+//   //   ifcTypeToMeshes.clear();
+//   //   const mgr = ifcLoader.ifcManager;
+//   //   const modelID = ifcModel.modelID;
+//   //
+//   //   const meshes = [];
+//   //   ifcModel.traverse((obj) => {
+//   //     if (obj.isMesh && obj.geometry && obj.material) meshes.push(obj);
+//   //   });
+//   //
+//   //   for (const mesh of meshes) {
+//   //     let expId;
+//   //     try {
+//   //       expId = await mgr.getExpressId(mesh.geometry, mesh);
+//   //     } catch (e) {
+//   //       expId = undefined;
+//   //     }
+//   //     if (expId === undefined || expId === null) continue;
+//   //
+//   //     let props;
+//   //     try {
+//   //       props = await mgr.getItemProperties(modelID, expId, false);
+//   //     } catch (e) {
+//   //       continue;
+//   //     }
+//   //     if (!props || !props.type) continue;
+//   //
+//   //     const typeName = props.type;
+//   //     if (!ifcTypeToMeshes.has(typeName)) ifcTypeToMeshes.set(typeName, []);
+//   //     ifcTypeToMeshes.get(typeName).push(mesh);
+//   //   }
+//   //
+//   //   buildIfcLayersPanelExperimental();
+//
+// Siguientes pasos recomendados para un desarrollador humano:
+//   - Abrir la consola y explorar ifcLoader.ifcManager directamente.
+//   - Probar métodos como:
+//       ifcLoader.ifcManager.getAllItemsOfType(modelID, someIFCConstant, true);
+//       ifcLoader.ifcManager.getIfcType(modelID, expId);
+//       ifcLoader.ifcManager.getPropertySets(modelID, expId);
+//   - Verificar qué estructura tienen las propiedades en la versión concreta
+//     de web-ifc/web-ifc-three usada aquí y con los IFC exportados desde
+//     Revit/Archicad, y adaptar el código de mapeo en consecuencia.
+// ---------------------------------------------------------------------
 
-  ifcModel.traverse((obj) => {
-    if (obj.isMesh) obj.visible = false;
-  });
-
-  for (const [typeName, meshes] of ifcTypeToMeshes.entries()) {
-    const visible = ifcVisibleTypes.has(typeName);
-    if (!meshes) continue;
-    for (const mesh of meshes) {
-      mesh.visible = visible;
-    }
-  }
-}
 
 // ---------------------------------------------------------------------
 // Carga principal IFC
@@ -665,7 +780,7 @@ async function initIfcFromContent() {
       titleEl.textContent = item.nombre || item.titulo || item.id;
     }
 
-    fillCollectionPanel(items, id);
+    setupCollectionSideNav(items, item);
 
     const archivo = item.archivo || '';
     const ext = archivo.split('.').pop().toLowerCase();
@@ -696,43 +811,6 @@ async function initIfcFromContent() {
           set.rendered = originalMat;
           meshMatCache[obj.uuid] = set;
         });
-
-        // construir mapa tipo IFC -> meshes
-        ifcTypeToMeshes.clear();
-        const mgr = ifcLoader.ifcManager;
-        const modelID = ifcModel.modelID;
-
-        const meshes = [];
-        ifcModel.traverse((obj) => {
-          if (obj.isMesh && obj.geometry && obj.material) {
-            meshes.push(obj);
-          }
-        });
-
-        for (const mesh of meshes) {
-          let expId;
-          try {
-            expId = await mgr.getExpressId(mesh.geometry, mesh);
-          } catch (e) {
-            expId = undefined;
-          }
-          if (expId === undefined || expId === null) continue;
-
-          let props;
-          try {
-            props = await mgr.getItemProperties(modelID, expId, false);
-          } catch (e) {
-            continue;
-          }
-          if (!props || !props.type) continue;
-
-          const typeName = props.type;
-
-          if (!ifcTypeToMeshes.has(typeName)) {
-            ifcTypeToMeshes.set(typeName, []);
-          }
-          ifcTypeToMeshes.get(typeName).push(mesh);
-        }
 
         const box = new THREE.Box3().setFromObject(ifcModel);
         box.getSize(modelSize);
@@ -981,3 +1059,4 @@ initLights();
 initUI();
 initIfcFromContent();
 animate();
+
