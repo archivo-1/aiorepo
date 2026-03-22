@@ -114,20 +114,13 @@
     }
   },
   {
-    "id": "IFC_DEMO01",
-    "nombre": "Modelo BIM(.ifc) de prueba",
-    "archivo": "models/demo.ifc",
-    "descripcion": "Archivo BIM exportado de Revit a .ifc de ejemplo, indexado para probar VisorBIM",
-    "categoria": "modelo-3d",
-    "tamano": "Especificar tamaño de archivo",
-    "coleccion": "Colección 1",
-    "thumbnail": "thumbnails/3dthumb.png",
-    "uiConfig": {
-      "cameraModes": ["orbit", "ortho", "walk", "fly"],
-      "visualStyles": ["rendered", "clay", "xray", "wireframe"],
-      "showLayers": true,
-      "showLighting": true,
-      "showShadows": true
-    }
+  "id": "DEMO_IFC01",
+  "nombre": "Modelo IFC Demo",
+  "archivo": "models/demo.ifc",
+  "descripcion": "Modelo IFC de ejemplo para pruebas",
+  "categoría": "ifc",
+  "coleccion": "demos",
+  "thumbnail": "thumbnails/demo-ifc.png"
+}
   }
 ]
