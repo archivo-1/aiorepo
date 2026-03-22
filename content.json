@@ -118,7 +118,7 @@
   "nombre": "Modelo IFC Demo",
   "archivo": "models/demo.ifc",
   "descripcion": "Modelo IFC de ejemplo para pruebas",
-  "categoría": "ifc",
+  "categoría": "modelo-3d",
   "coleccion": "demos",
   "thumbnail": "thumbnails/demo-ifc.png"
   }
