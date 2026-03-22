@@ -70,9 +70,6 @@ canvas,
   margin-bottom: 2px;
 }
 
-.help-overlay.hidden {
-  display: none;
-}
 
 /* ---------- BARRA SUPERIOR: TÍTULO + BOTONES ---------- */
 
@@ -164,7 +161,7 @@ canvas,
   gap: 4px;
 }
 
-/* Botones de cámara, alineados al visor 3DM */
+/* Botones de cámara */
 .cam-btn {
   padding: 0.38rem 0.7rem;
   font-size: 0.73rem;
@@ -206,7 +203,7 @@ canvas,
   z-index: 10;
 }
 
-/* Botones de estilo como en 3DM */
+/* Botones de estilo */
 .style-btn {
   padding: 0.28rem 0.65rem;
   font-size: 0.7rem;
@@ -571,39 +568,59 @@ input[type='range']::-moz-range-thumb {
     max-height: 35vh;
   }
 
-  /* 3) Panel de fondo/luz estilo chip plegado */
-  .env-panel {
-    right: 16px;
-    bottom: 80px;
-    width: 210px;
-    padding: 4px 8px 8px;
-    border-radius: 12px;
+  /* 3) Rueda de configuración para el panel de entorno */
+  #side-controls {
+    position: fixed;
+    bottom: 88px;
+    right: 8px;
+    width: 48px;
+    height: 48px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 0;
+    overflow: hidden;
+    transition: width 0.3s, height 0.3s;
+    z-index: 10;
   }
 
-  .env-panel.compact .env-section:not(.env-toggle) {
+  #side-controls::before {
+    content: '⚙';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    font-size: 1.4rem;
+    color: #9ca3af;
+    flex-shrink: 0;
+    background: rgba(10, 12, 20, 0.85);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(4px);
+  }
+
+  #side-controls:focus-within,
+  #side-controls:hover {
+    width: 200px;
+    height: auto;
+    max-height: 400px;
+  }
+
+  #side-controls:focus-within::before,
+  #side-controls:hover::before {
     display: none;
   }
 
-  .env-panel.compact {
+  #side-controls .env-panel {
+    position: static;
     width: auto;
-    min-width: 120px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    flex-direction: row;
-    align-items: center;
+    padding: 0.6rem 0.8rem;
+    display: none;
   }
 
-  .env-toggle {
+  #side-controls:focus-within .env-panel,
+  #side-controls:hover .env-panel {
     display: block;
-    font-size: 11px;
-    color: #e5e7eb;
-  }
-
-  .env-section:not(.env-toggle) {
-    display: flex;
   }
 
   /* 4) Botones inferiores más pequeños */
