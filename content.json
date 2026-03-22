@@ -91,7 +91,7 @@
     "uiConfig": {
       "cameraModes": ["orbit","ortho","fly"],
       "visualStyles": ["rendered", "clay","xray"],
-      "showLayers": false,
+      "showLayers": true,
       "showLighting": true,
       "showShadows": true
     }
