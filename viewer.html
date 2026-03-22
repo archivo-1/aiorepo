@@ -367,12 +367,28 @@
 
             const itemList = document.getElementById('collItemList');
             itemList.innerHTML = siblings.map(i => {
-                let url = "";
-                // Respetando estrictamente cómo se formatea en viewer-map.html y viewer-media.html
-                if (i.categoria === 'modelo-3d') url = `viewer.html?file=models/${i.archivo}`;
-                else if (i.categoria === 'mapa') url = `viewer-map.html?id=${i.id}`;
-                else url = `viewer-media.html?id=${i.id}`;
-                return `<a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">${i.nombre}</a>`;
+            let url = "";
+            const archivo = String(i.archivo || "");
+            const ext = archivo.split('.').pop().toLowerCase();
+
+            if (i.categoria === 'mapa') {
+                url = `viewer-map.html?id=${i.id}`;
+            } else if (i.categoria === 'modelo-3d') {
+                if (ext === 'ifc') {
+                // IFC → visor IFC por id
+                url = `viewer-ifc.html?id=${i.id}`;
+                } else {
+                // 3DM u otros modelos → visor 3D
+                url = `viewer.html?file=models/${i.archivo}`;
+                }
+            } else {
+                // Resto: media (video, pdf, enlace, imagen, etc.)
+                url = `viewer-media.html?id=${i.id}`;
+            }
+
+            return `<a href="${url}" class="coll-item ${
+                i.id === currentItem.id ? 'active' : ''
+            }">${i.nombre}</a>`;
             }).join('');
 
             const tab = document.getElementById('collTab');
