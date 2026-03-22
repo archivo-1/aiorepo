@@ -1,18 +1,16 @@
-// viewer-ifc.js (en la raíz del proyecto)
+// viewer-ifc.js (en la raíz del proyecto, usando importmap de viewer-ifc.html)
 
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-import { IFCLoader } from 'https://cdn.jsdelivr.net/npm/web-ifc-three@0.0.122/IFCLoader.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { IFCLoader } from 'web-ifc-three/IFCLoader.js';
 
 // ---------------------------------------------------------------------
 // Escena básica
 // ---------------------------------------------------------------------
 const app = document.querySelector('#app');
 
-// Canvas Three
-const canvas = document.createElement('canvas');
-canvas.id = 'three-canvas';
-app.appendChild(canvas);
+// Usamos el <canvas id="three-canvas"> ya presente en el HTML
+const canvas = document.getElementById('three-canvas');
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -530,12 +528,13 @@ function getIdFromQuery() {
 
 function buildModelUrl(archivo) {
   if (/^https?:\/\//i.test(archivo)) return archivo;
-  // si viene como "models/demo.ifc" lo usamos tal cual
   return archivo;
 }
 
 // Loader IFC
 const ifcLoader = new IFCLoader();
+// IMPORTANTE: ruta relativa al HTML que sirve viewer-ifc.html
+// Asegúrate de que en tu repo exista /libs/ifc/ con los .wasm adecuados
 ifcLoader.ifcManager.setWasmPath('libs/ifc/');
 
 // Overlay ayuda
@@ -765,7 +764,7 @@ async function initIfcFromContent() {
         updateSunFromUI();
         buildIfcLayersPanel();
 
-        if (helpOverlay) helpOverlay.classList.remove('hidden');
+        if (helpOverlay) helpOverlay.classList.add('hidden');
       },
       undefined,
       (err) => {
