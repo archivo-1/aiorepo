@@ -535,7 +535,7 @@ function buildModelUrl(archivo) {
 const ifcLoader = new IFCLoader();
 // IMPORTANTE: ruta relativa al HTML que sirve viewer-ifc.html
 // Asegúrate de que en tu repo exista /libs/ifc/ con los .wasm adecuados
-ifcLoader.ifcManager.setWasmPath('libs/ifc/');
+ifcLoader.ifcManager.setWasmPath('https://unpkg.com/web-ifc@0.0.56/');
 
 // Overlay ayuda
 const helpOverlay = document.getElementById('help-overlay');
