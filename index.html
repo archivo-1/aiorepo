@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIO Archivo-1</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#050608"> 
+
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -158,6 +162,12 @@
 <footer>Archivo-1 — <a href="https://github.com/archivo-1/aiorepo">github.com/archivo-1/aiorepo</a></footer>
 
 <script>
+    // Add this registration block at the top of your script
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(() => console.log("Service Worker Registered"));
+    }
+    
     let MODELS = [];
     const CATEGORIAS = ['modelo-3d', 'pdf', 'video', 'galeria', 'enlace', 'audio','mapa'];
     let activeFilter = 'all';
