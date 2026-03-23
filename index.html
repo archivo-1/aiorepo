@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aio Archivo-1</title>
+    <title>AIO Archivo-1</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -127,8 +127,8 @@
 
 <header>
     <a href="index.html" class="logo">
-        <h1>Aio Archivo-1</h1>
-        <span>Visor web all-in-one</span>
+        <h1>AIO Archivo-1</h1>
+        <span>Galería HTML+JS</span>
     </a>
     <div class="controls-wrap">
         <div class="search-wrap">
@@ -155,7 +155,7 @@
     <div id="grid"></div>
 </main>
 
-<footer>Aio — Archivo-1</footer>
+<footer>Archivo-1 — <a href="https://github.com/archivo-1/aiorepo">github.com/archivo-1/aiorepo</a></footer>
 
 <script>
     let MODELS = [];
@@ -285,8 +285,12 @@
                 if (ext === 'ifc') {
                     // Modelos BIM → visor IFC (usa id, como en otros viewers)
                     window.location.href = `viewer-ifc.html?id=${m.id}`;
+                }
+                else if (ext === 'dxf') {
+                    // Modelos dxf → visor dxf (usa id, como en otros viewers)
+                    window.location.href = `viewer-dxf.html?id=${m.id}`;
                 } else {
-                    // Modelos 3D normales (3DM, etc.) → visor 3D existente
+                    // Modelos 3Dm  
                     window.location.href = `viewer.html?file=models/${m.archivo}`;
                 }
             } else if (m.categoria === 'mapa') {
