@@ -1,10 +1,14 @@
 {
+  "id": "/aiorepo/",
   "name": "AIO Archivo-1",
   "short_name": "AIO",
+  "description": "Repositorio de modelos 3D y archivos de arquitectura.",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "background_color": "#050608",
+  "theme_color": "#050608",
+  "categories": ["productivity", "education"],
   "icons": [
     {
       "src": "thumbnails/icon-192.png",
