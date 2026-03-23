@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>ArchVista IFC</title>
+    <title>Aio - Visor IFC</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style-ifc.css" />
     <script type="importmap">
@@ -18,28 +18,50 @@
 </script>
   </head>
   <body>
+    <div id="loading">
+  <div class="spinner"></div>
+  <p>Cargando modelo IFC...</p>
+</div>
     <div id="app">
       <canvas id="three-canvas"></canvas>
 
       <!-- Panel ayuda / overlay -->
       <div id="help-overlay" class="help-overlay">
-        <div class="help-card">
-          <h1>ArchVista IFC</h1>
-          <p>Cargando modelo IFC...</p>
-          <ul>
-            <li>Click Izq. Orbitar</li>
-            <li>Click Der. Panear</li>
-            <li>Scroll Zoom</li>
-            <li>R Resetear</li>
-            <li>Click Bloq. cursor</li>
-            <li>W A S D Mover</li>
-            <li>Mouse Mirar</li>
-            <li>Esc Soltar cursor</li>
-            <li>Space/Shift Arriba/Abajo</li>
-            <li>Drag Panear</li>
-          </ul>
-        </div>
-      </div>
+  <div class="help-card" id="help-card-inner">
+    <h1>Controles</h1>
+
+    <div id="orbit-controls">
+      <p class="ctrl-row"><span class="ctrl-key">Click Izq.</span> Orbitar</p>
+      <p class="ctrl-row"><span class="ctrl-key">Click Der.</span> Panear</p>
+      <p class="ctrl-row"><span class="ctrl-key">Scroll</span> Zoom</p>
+      <p class="ctrl-row"><span class="ctrl-key">R</span> Resetear</p>
+    </div>
+
+    <div id="walk-controls" style="display:none">
+      <p class="ctrl-row"><span class="ctrl-key">Click</span> Bloq. cursor</p>
+      <p class="ctrl-row"><span class="ctrl-key">W A S D</span> Mover</p>
+      <p class="ctrl-row"><span class="ctrl-key">Mouse</span> Mirar</p>
+      <p class="ctrl-row"><span class="ctrl-key">Esc</span> Soltar cursor</p>
+    </div>
+
+    <div id="fly-controls" style="display:none">
+      <p class="ctrl-row"><span class="ctrl-key">Click</span> Bloq. cursor</p>
+      <p class="ctrl-row"><span class="ctrl-key">W A S D</span> Mover</p>
+      <p class="ctrl-row"><span class="ctrl-key">Space/Shift</span> Arriba/Abajo</p>
+      <p class="ctrl-row"><span class="ctrl-key">Mouse</span> Mirar</p>
+      <p class="ctrl-row"><span class="ctrl-key">Esc</span> Soltar cursor</p>
+    </div>
+
+    <div id="ortho-controls" style="display:none">
+      <p class="ctrl-row"><span class="ctrl-key">Drag</span> Panear</p>
+      <p class="ctrl-row"><span class="ctrl-key">Scroll</span> Zoom</p>
+      <p class="ctrl-row"><span class="ctrl-key">R</span> Resetear</p>
+    </div>
+
+    <div class="mode-indicator">Modo: <span id="mode-label">Orbit</span></div>
+  </div>
+</div>
+
 
       <!-- Barra superior: titulo + botones -->
       <div id="top-bar">
