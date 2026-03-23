@@ -410,7 +410,27 @@ function setCameraMode(mode) {
 
   velocity.set(0, 0, 0);
   updateModeUI();
+  const ev = new CustomEvent('modchange', { detail: mode });
+  document.dispatchEvent(ev);
 }
+
+document.addEventListener('modchange', function (e) {
+  const mode = e.detail;
+  document.getElementById('orbit-controls').style.display =
+    mode === 'orbit' ? '' : 'none';
+  document.getElementById('walk-controls').style.display =
+    mode === 'walk' ? '' : 'none';
+  document.getElementById('fly-controls').style.display =
+    mode === 'fly' ? '' : 'none';
+  document.getElementById('ortho-controls').style.display =
+    mode === 'ortho' ? '' : 'none';
+
+  const hint = document.getElementById('lock-hint');
+  if (hint) {
+    hint.classList.toggle('visible', mode === 'walk' || mode === 'fly');
+  }
+});
+
 
 function toggleOrtho() {
   isOrthoOrbit = !isOrthoOrbit;
@@ -551,6 +571,8 @@ const ifcLoader = new IFCLoader();
 // Usamos el wasm desde unpkg para que coincida con web-ifc 0.0.56
 ifcLoader.ifcManager.setWasmPath('https://unpkg.com/web-ifc@0.0.56/');
 
+
+
 // Overlay ayuda
 const helpOverlay = document.getElementById('help-overlay');
 const helpText = helpOverlay ? helpOverlay.querySelector('p') : null;
@@ -610,6 +632,13 @@ function setupCollectionSideNav(allData, currentItem) {
     }
   });
 }
+const loadingOverlay = document.getElementById('loading');
+
+// Al inicio, asegúrate de que esté visible (por si recargas):
+if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+
+
+
 
 
 // ---------------------------------------------------------------------
@@ -843,6 +872,7 @@ async function initIfcFromContent() {
         buildIfcLayersPanel();
 
         if (helpOverlay) helpOverlay.classList.add('hidden');
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
       },
       undefined,
       (err) => {
@@ -850,6 +880,7 @@ async function initIfcFromContent() {
         if (helpText)
           helpText.textContent =
             'Error cargando IFC. Revisa la consola.';
+            if (loadingOverlay) loadingOverlay.classList.add('hidden');
       }
     );
   } catch (err) {
@@ -1059,4 +1090,3 @@ initLights();
 initUI();
 initIfcFromContent();
 animate();
-
