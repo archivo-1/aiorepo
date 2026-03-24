@@ -194,5 +194,45 @@
     "showLighting": false,
     "showShadows": false
   }
+  },
+  {
+    "id": "MP3_DEMO01",
+    "nombre": "Archivo audio (.mp3) de prueba",
+    "archivo": "audio/demo1.mp3",
+    "categoria": "audio",
+    "descripcion": "Sitio externo que no permite marcos (Iframe). Se abrirá en una pestaña nueva.",
+    "coleccion": "Colección 1",
+    "visor": "media",
+    "thumbnail": "thumbnails/gt_0.png"
+  },
+  {
+    "id": "TXT_DEMO01",
+    "nombre": "Archivo de texto (.txt) de prueba",
+    "archivo": "txt/demo1.txt",
+    "categoria": "doc",
+    "descripcion": "Sitio externo que no permite marcos (Iframe). Se abrirá en una pestaña nueva.",
+    "coleccion": "Colección 1",
+    "visor": "media",
+    "thumbnail": "thumbnails/gt_0.png"
+  },
+  {
+    "id": "WEBEXT_DEMO01",
+    "nombre": "Catálogo de Proveedor",
+    "archivo": "https://www.sodimac.cl/sodimac-cl/articulo/119867824/Escalera-Aluminio-Multiuso-5,7-Mts.-20-peldanos-QRubber/119867826",
+    "categoria": "enlaceEXT",
+    "descripcion": "Sitio externo que no permite marcos (Iframe). Se abrirá en una pestaña nueva.",
+    "coleccion": "Colección 1",
+    "visor": "media",
+    "thumbnail": "thumbnails/gt_webext.png"
+  },
+  {
+    "id": "YOUTUBE_DEMO01",
+    "nombre": "Referencia: Recorrido Virtual",
+    "archivo": "https://www.youtube.com/watch?v=dgo-As552hY",
+    "categoria": "yt/vm",
+    "descripcion": "Video de YouTube con referencias de diseño.",
+    "coleccion": "Colección 1",
+    "visor": "media",
+    "thumbnail": "thumbnails/gt_0.png"
   }
 ]
