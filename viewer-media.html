@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Aio Archivo-1 - Visor de media</title>
+    <title>ArchVista - Visor Multimedia</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <style>
         :root { --accent: #00f2ff; --bg: #050608; --panel: #0d1117; --header-h: 52px; }
@@ -280,32 +280,26 @@
         function setupCollectionSideNav(allData, currentItem) {
             const collName = currentItem.coleccion;
             if (!collName) return;
+
             const siblings = allData.filter(i => i.coleccion === collName);
             if (siblings.length <= 1) return;
 
             const container = document.getElementById('collection-nav');
             container.style.display = 'flex';
-            document.getElementById('collNameLabel').textContent = collName;
-            const itemList = document.getElementById('collItemList');
             
+            const label = document.getElementById('collNameLabel');
+            if (label) label.textContent = collName;
+
+            const itemList = document.getElementById('collItemList');
             itemList.innerHTML = siblings.map(i => {
-                const archivo = String(i.archivo || '');
-                const ext = archivo.split('.').pop().toLowerCase();
-                let url;
-
-                if (i.categoria === 'modelo-3d') {
-                    if (ext === 'ifc') {
-                        url = `viewer-ifc.html?id=${i.id}`;
-                    } else {
-                        url = `viewer.html?file=models/${i.archivo}`;
-                    }
-                } else if (i.categoria === 'mapa') {
-                    url = `viewer-map.html?id=${i.id}`;
-                } else {
-                    url = `viewer-media.html?id=${i.id}`;
-                }
-
-                return `<a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">${i.nombre}</a>`;
+                // Lógica dinámica: usa el visor indicado o 'media' por defecto
+                const visorType = i.visor || 'media';
+                const url = `viewer-${visorType}.html?id=${i.id}`;
+                
+                return `
+                    <a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">
+                        ${i.nombre}
+                    </a>`;
             }).join('');
 
             // MODIFICACIÓN: Solución para que el panel pueda cerrarse al hacer clic fuera, incluso sobre el iframe
