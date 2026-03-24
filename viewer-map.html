@@ -310,36 +310,27 @@
         function setupCollectionSideNav(allData, currentItem) {
             const collName = currentItem.coleccion;
             if (!collName) return;
+
             const siblings = allData.filter(i => i.coleccion === collName);
             if (siblings.length <= 1) return;
 
             const container = document.getElementById('collection-nav');
             container.style.display = 'flex';
-            const itemList = document.getElementById('collItemList');
             
-              itemList.innerHTML = siblings
-            .map((i) => {
-            let url = '';
-            const archivo = String(i.archivo || '');
-            const ext = archivo.split('.').pop().toLowerCase();
+            const label = document.getElementById('collNameLabel');
+            if (label) label.textContent = collName;
 
-            if (i.categoria === 'mapa') {
-                url = `viewer-map.html?id=${i.id}`;
-            } else if (i.categoria === 'modelo-3d') {
-                if (ext === 'ifc') {
-                url = `viewer-ifc.html?id=${i.id}`;
-                } else {
-                url = `viewer.html?file=models/${i.archivo}`;
-                }
-            } else {
-                url = `viewer-media.html?id=${i.id}`;
-            }
-
-            return `<a href="${url}" class="coll-item ${
-                i.id === currentItem.id ? 'active' : ''
-            }">${i.nombre || i.titulo || i.id}</a>`;
-            })
-            .join('');
+            const itemList = document.getElementById('collItemList');
+            itemList.innerHTML = siblings.map(i => {
+                // Lógica dinámica: usa el visor indicado o 'media' por defecto
+                const visorType = i.visor || 'media';
+                const url = `viewer-${visorType}.html?id=${i.id}`;
+                
+                return `
+                    <a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">
+                        ${i.nombre}
+                    </a>`;
+            }).join('');
 
 
             document.getElementById('collTab').onclick = (e) => {
