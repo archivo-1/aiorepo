@@ -213,7 +213,10 @@
                 const toolbar = document.getElementById('toolbar-actions');
                 const ext = item.archivo.split('.').pop().toLowerCase();
 
-                toolbar.innerHTML = `<a href="${item.archivo}" download class="btn-action">Descargar</a>`;
+                // Evitar mostrar botón de descargar para enlaces y YT/VM
+                if (!['enlace', 'enlaceEXT', 'yt/vm'].includes(item.categoria)) {
+                    toolbar.innerHTML = `<a href="${item.archivo}" download class="btn-action">Descargar</a>`;
+                }
 
                 if (item.categoria === 'pdf' || ext === 'pdf') {
                     document.getElementById('zoom-controls').style.display = 'flex';
@@ -223,13 +226,71 @@
                 else if (item.categoria === 'video') {
                     wrapper.innerHTML = `<div class="video-container"><video controls playsinline autoplay src="${item.archivo}"></video><div class="metadata-card"><h2>Descripción</h2><p>${item.descripcion || 'Sin descripción.'}</p></div></div>`;
                 } 
+                else if (['jpg','png','webp','jpeg'].includes(ext)) {
+                    wrapper.innerHTML = `<img src="${item.archivo}" style="max-width:100%; margin:20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">`;
+                }
                 else if (item.categoria === 'enlace') {
                     toolbar.innerHTML = `<button class="btn-action" onclick="window.open('${item.archivo}', '_blank')">Pestaña ↗</button>`;
                     wrapper.innerHTML = `<div class="iframe-container"><iframe src="${item.archivo}" allowfullscreen></iframe></div>`;
                 } 
-                else if (['jpg','png','webp','jpeg'].includes(ext)) {
-                    wrapper.innerHTML = `<img src="${item.archivo}" style="max-width:100%; margin:20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">`;
+                
+                // --- NUEVOS FORMATOS ---
+                
+                // AUDIO (.mp3, .wav)
+                else if (item.categoria === 'audio' || ['mp3', 'wav'].includes(ext)) {
+                    wrapper.innerHTML = `
+                        <div class="video-container" style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100%; min-height: 400px;">
+                            <audio controls autoplay src="${item.archivo}" style="width:100%; outline: none;"></audio>
+                            <div class="metadata-card" style="width:100%; text-align: left;">
+                                <h2>Descripción</h2>
+                                <p>${item.descripcion || 'Reproduciendo archivo de audio.'}</p>
+                            </div>
+                        </div>`;
                 }
+                
+                // TEXTO (.txt)
+                else if (item.categoria === 'txt' || ext === 'txt') {
+                    const txtResponse = await fetch(item.archivo);
+                    const content = await txtResponse.text();
+                    wrapper.innerHTML = `
+                        <div style="width: 100%; padding: 2rem; display: flex; justify-content: center;">
+                            <pre style="background: var(--panel); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); color: #e5e7eb; white-space: pre-wrap; word-wrap: break-word; font-family: monospace; max-width: 800px; width: 100%; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+                        </div>`;
+                }
+                
+                // YOUTUBE / VIMEO (yt/vm)
+                else if (item.categoria === 'yt/vm') {
+                    let embedUrl = item.archivo;
+                    
+                    // Convertir URLs estándar a URLs de Embed
+                    if (embedUrl.includes('youtube.com/watch?v=')) {
+                        embedUrl = embedUrl.replace('youtube.com/watch?v=', 'youtube.com/embed/').split('&')[0];
+                    } else if (embedUrl.includes('youtu.be/')) {
+                        embedUrl = embedUrl.replace('youtu.be/', 'youtube.com/embed/').split('?')[0];
+                    } else if (embedUrl.includes('vimeo.com/') && !embedUrl.includes('player.vimeo.com/video/')) {
+                        const vimeoId = embedUrl.split('vimeo.com/')[1].split('/')[0];
+                        embedUrl = `https://player.vimeo.com/video/${vimeoId}`;
+                    }
+
+                    toolbar.innerHTML = `<button class="btn-action" onclick="window.open('${item.archivo}', '_blank')">Pestaña ↗</button>`;
+                    wrapper.innerHTML = `<div class="iframe-container"><iframe src="${embedUrl}" allowfullscreen></iframe></div>`;
+                }
+                
+                // ENLACE EXTERNO SIN IFRAME (enlaceEXT)
+                else if (item.categoria === 'enlaceEXT') {
+                    toolbar.innerHTML = `<button class="btn-action" onclick="window.open('${item.archivo}', '_blank')">Pestaña ↗</button>`;
+                    wrapper.innerHTML = `
+                        <div style="display:flex; align-items:center; justify-content:center; height: calc(100vh - var(--header-h)); width:100%; padding: 2rem;">
+                            <div class="metadata-card" style="text-align:center; max-width: 450px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                                <h2 style="color: #fff; font-size: 1.3rem;">Contenido Externo</h2>
+                                <p style="color: #9ca3af; font-size: 0.95rem; line-height: 1.5;">${item.descripcion || 'Este contenido está alojado en un sitio externo que requiere ser abierto en una nueva pestaña para su correcta visualización.'}</p>
+                                <a href="${item.archivo}" target="_blank" style="margin-top: 10px; display: inline-block; background: var(--accent); color: #000; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase;">
+                                    Abrir en nueva pestaña ↗
+                                </a>
+                            </div>
+                        </div>`;
+                }
+
             } catch (err) { wrapper.innerHTML = `<p style="padding:2rem;">Error: ${err.message}</p>`; }
         }
 
@@ -292,7 +353,6 @@
 
             const itemList = document.getElementById('collItemList');
             itemList.innerHTML = siblings.map(i => {
-                // Lógica dinámica: usa el visor indicado o 'media' por defecto
                 const visorType = i.visor || 'media';
                 const url = `viewer-${visorType}.html?id=${i.id}`;
                 
@@ -302,12 +362,10 @@
                     </a>`;
             }).join('');
 
-            // MODIFICACIÓN: Solución para que el panel pueda cerrarse al hacer clic fuera, incluso sobre el iframe
             document.getElementById('collTab').onclick = (e) => {
                 e.stopPropagation();
                 const isOpen = container.classList.toggle('open');
                 
-                // Desactiva los eventos del iframe cuando el menú está abierto
                 const iframe = document.querySelector('.iframe-container iframe');
                 if (iframe) {
                     iframe.style.pointerEvents = isOpen ? 'none' : 'auto';
@@ -318,7 +376,6 @@
                 if (!container.contains(e.target)) {
                     container.classList.remove('open');
                     
-                    // Restaura los eventos del iframe al cerrar el menú
                     const iframe = document.querySelector('.iframe-container iframe');
                     if (iframe) {
                         iframe.style.pointerEvents = 'auto';
