@@ -56,7 +56,7 @@
   },
   {
     "id": "GEOJSON_DEMO02",
-    "nombre": "(Mapa) Coordenadas .geojson de prueba",",
+    "nombre": "(Mapa) Coordenadas .geojson de prueba",
     "archivo": "data/demo02.geojson",
     "descripcion": "Coordenadas listadas en un script .geojson de ejemplo, indexado para probar Aio-ViewerMap + OpenStreetMap",
     "categoria": "map",
