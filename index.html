@@ -70,11 +70,52 @@
             padding: 0.45rem; font-size: 0.82rem; outline: none; cursor: pointer;
         }
 
-        .filters { padding: 0.75rem 2rem 0; display: flex; gap: 0.35rem; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+        /* --- Scrollable Filters with Gradients --- */
+        .filters-container {
+            position: relative;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+        
+        /* Left gradient shadow */
+        .filters-container::before {
+            content: "";
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 40px;
+            background: linear-gradient(to right, var(--bg), transparent);
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        /* Right gradient shadow */
+        .filters-container::after {
+            content: "";
+            position: absolute;
+            right: 0; top: 0; bottom: 0;
+            width: 40px;
+            background: linear-gradient(to left, var(--bg), transparent);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .filters { 
+            padding: 0.75rem 2rem 0; 
+            display: flex; 
+            gap: 0.35rem; 
+            flex-wrap: nowrap; 
+            overflow-x: auto; 
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .filters::-webkit-scrollbar { display: none; }
+
         .filter-btn {
             display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.32rem 0.8rem; margin-bottom: 0.75rem;
             font-size: 0.78rem; font-weight: 500; background: transparent; color: var(--muted);
             border: 1px solid transparent; border-radius: 20px; cursor: pointer; transition: all 0.12s;
+            flex-shrink: 0;
         }
         .filter-btn:hover { color: var(--text); border-color: var(--border2); }
         .filter-btn.active { background: var(--accent-dim); color: #93c5fd; border-color: rgba(59,130,246,0.3); }
@@ -96,12 +137,12 @@
         .collection-header h2 { 
             font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; 
             color: var(--accent); flex: 1; display: flex; align-items: center; gap: 0.5rem;
-            pointer-events: none; /* Evita que el texto interfiera con el clic del header */
+            pointer-events: none;
         }
         .collection-arrow { font-size: 0.6rem; transition: transform 0.3s; color: var(--muted); transform: rotate(0deg); pointer-events: none; }
         .collection-content { padding: 1.15rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 1.15rem; }
 
-        /* --- Estado Colapsado (Tarjetas Compactas) --- */
+        /* --- Estado Colapsado --- */
         .collection-section.collapsed .collection-content { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem 1rem 1rem; }
         .collection-section.collapsed .collection-arrow { transform: rotate(-90deg); }
 
@@ -116,7 +157,6 @@
         .card-footer { padding: 0.65rem 1rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
         .btn-view { font-size: 0.73rem; font-weight: 500; padding: 0.3rem 0.8rem; background: var(--accent-dim); color: #93c5fd; border: 1px solid rgba(59,130,246,0.28); border-radius: 6px; cursor: pointer; }
 
-        /* Sobreescritura para vista compacta */
         .collapsed .card { flex-direction: row; align-items: center; height: 64px; border-color: transparent; background: transparent; gap: 0.5rem; position: relative; z-index: 10; }
         .collapsed .card:hover { background: rgba(255,255,255,0.03); transform: none; box-shadow: none; }
         .collapsed .card-thumb { width: 56px !important; height: 42px !important; flex-shrink: 0; margin-left: 0.5rem; border-radius: 6px; }
@@ -128,6 +168,7 @@
 
         @media (max-width: 768px) {
             header { padding: 1rem; }
+            .filters { padding: 0.75rem 1rem 0; }
             main { padding: 0.75rem; }
             .collection-content { padding: 0.5rem; }
             .collapsed .card-title { max-width: 140px; }
@@ -155,8 +196,10 @@
     </div>
 </header>
 
-<div class="filters" id="filters">
-    <button class="filter-btn active" data-cat="all">Todo <span class="tab-count" id="count-all">0</span></button>
+<div class="filters-container">
+    <div class="filters" id="filters">
+        <button class="filter-btn active" data-cat="all">Todo <span class="tab-count" id="count-all">0</span></button>
+    </div>
 </div>
 
 <main id="main-container">
@@ -169,7 +212,6 @@
 <footer>Archivo-1 — <a href="https://github.com/archivo-1/aiorepo">github.com/archivo-1/aiorepo</a></footer>
 
 <script>
-    // Add this registration block at the top of your script
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
             .then(() => console.log("Service Worker Registered"));
@@ -218,9 +260,7 @@
         });
     }
 
-    // --- FUNCIÓN DE TOGGLE REFORZADA ---
     function toggleCollection(headerElement) {
-        // Solo actúa sobre el padre directo .collection-section
         headerElement.closest('.collection-section').classList.toggle('collapsed');
     }
 
@@ -260,7 +300,6 @@
             grupos.forEach(groupName => {
                 const section = document.createElement('div');
                 section.className = 'collection-section';
-                // Si hay una búsqueda activa, no colapsamos para mostrar resultados
                 if (isMobile && !searchQuery) section.classList.add('collapsed');
 
                 const displayName = currentSort === 'tipo' ? (nombresCategoria[groupName] || groupName) : groupName;
@@ -289,16 +328,11 @@
     function createCard(m) {
         const card = document.createElement('div');
         card.className = 'card';
-        
-        // --- NAVEGACIÓN DIRECTA CON STOP PROPAGATION ---
         card.onclick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Ahora el index no adivina. El JSON le dice exactamente a dónde ir.
-    // Estandarizamos TODO para usar "?id="
-    window.location.href = `viewer-${m.visor}.html?id=${m.id}`;
-    };
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = `viewer-${m.visor}.html?id=${m.id}`;
+        };
 
         const thumb = m.thumbnail ? `<img src="${m.thumbnail}" alt="">` : `<div style="color:#1e2535">📁</div>`;
         card.innerHTML = `
