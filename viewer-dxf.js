@@ -32,12 +32,10 @@
         const metrics = context.measureText(message);
         const textWidth = metrics.width;
 
-        // algo de padding
         const padding = 6;
         canvas.width = textWidth + padding * 2;
         canvas.height = fontsize + padding * 2;
 
-        // volver a setear la fuente después de cambiar width/height
         context.font = fontsize + 'px ' + fontface;
         context.fillStyle = backgroundColor;
         context.fillRect(0, 0, canvas.width, canvas.height);
@@ -47,12 +45,23 @@
         context.fillText(message, padding, padding);
 
         const texture = new THREE.CanvasTexture(canvas);
-        const material = new THREE.SpriteMaterial({ map: texture, depthTest: true, depthWrite: false });
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            depthTest: true,
+            depthWrite: false,
+            transparent: true
+        });
         const sprite = new THREE.Sprite(material);
 
-        // escalar a unidades del modelo de forma aproximada
-        const scaleFactor = 1; // ajusta esto según escala de tu plano
-        sprite.scale.set(canvas.width * scaleFactor, canvas.height * scaleFactor, 1);
+        // Escalado: ajustado para que sea visible
+        const base = 0.5; 
+        const minSize = modelSpan * 0.02;
+        const scaleFactor = base * (modelSpan / 100);
+
+        const widthWorld = Math.max(canvas.width * scaleFactor, minSize);
+        const heightWorld = Math.max(canvas.height * scaleFactor, minSize * (canvas.height / canvas.width));
+
+        sprite.scale.set(widthWorld, heightWorld, 1);
 
         return sprite;
     }
@@ -93,7 +102,7 @@
         return false;
     }
 
-    function applyConfiguration(config, isActually3D) {
+    function applyConfiguration(config, isActually 3D) {
         const force2D = !isActually3D || (config.cameraModes && config.cameraModes.length === 0);
 
         if (force2D) {
@@ -224,45 +233,33 @@
                 const geo = new THREE.BufferGeometry().setFromPoints(points);
                 mesh = new THREE.Line(geo, mat);
             }
-            // HATCH (contorno simple mejorado)
+            // HATCH (contorno simple)
             else if (entity.type === 'HATCH') {
                 if (!entity.loops) return;
                 entity.loops.forEach(loop => {
                     const loopPoints = [];
-
                     if (loop.entities && Array.isArray(loop.entities)) {
                         loop.entities.forEach(e => {
                             if (e.type === 'LINE' && e.vertices && e.vertices.length >= 2) {
-                                const v1 = e.vertices[0];
-                                const v2 = e.vertices[1];
                                 loopPoints.push(
-                                    new THREE.Vector3(v1.x, v1.y, v1.z || 0),
-                                    new THREE.Vector3(v2.x, v2.y, v2.z || 0)
+                                    new THREE.Vector3(e.vertices[0].x, e.vertices[0].y, e.vertices[0].z || 0),
+                                    new THREE.Vector3(e.vertices[1].x, e.vertices[1].y, e.vertices[1].z || 0)
                                 );
                             } else if (e.type === 'ARC') {
                                 const c = e.center;
                                 const r = e.radius;
                                 const start = e.startAngle || 0;
                                 const end = e.endAngle || Math.PI * 2;
-                                const arcCurve = new THREE.ArcCurve(
-                                    c.x,
-                                    c.y,
-                                    r,
-                                    start,
-                                    end,
-                                    false
-                                );
+                                const arcCurve = new THREE.ArcCurve(c.x, c.y, r, start, end, false);
                                 const pts = arcCurve.getPoints(16).map(p => new THREE.Vector3(p.x, p.y, c.z || 0));
                                 loopPoints.push(...pts);
                             }
                         });
                     }
-
                     if (loopPoints.length > 1) {
                         const first = loopPoints[0];
                         const last = loopPoints[loopPoints.length - 1];
                         if (!first.equals(last)) loopPoints.push(first.clone());
-
                         const geo = new THREE.BufferGeometry().setFromPoints(loopPoints);
                         const hatchLine = new THREE.Line(geo, mat);
                         hatchLine.userData.layer = layerName;
@@ -270,99 +267,66 @@
                     }
                 });
             }
-            // DIMENSION (básico: usa bloque de geometría o línea simple)
+            // DIMENSION (Ajustado para tus campos)
             else if (entity.type === 'DIMENSION') {
-                console.log('DIMENSION entity:', entity);
+                const p1 = entity.linearOrAngularPoint1 || entity.anchorPoint;
+                const p2 = entity.linearOrAngularPoint2 || entity.anchorPoint;
+                if (p1 && p2) {
+                    const v1 = new THREE.Vector3(p1.x, p1.y, p1.z || 0);
+                    const v2 = new THREE.Vector3(p2.x, p2.y, p2.z || 0);
+                    const geo = new THREE.BufferGeometry().setFromPoints([v1, v2]);
+                    const line = new THREE.Line(geo, mat);
+                    line.userData.layer = layerName;
+                    group.add(line);
 
-                const dimMat = mat;
+                    // Ticks
+                    const dir = v2.clone().sub(v1).normalize();
+                    const normal = new THREE.Vector3(-dir.y, dir.x, dir.z);
+                    const tickSize = v1.distanceTo(v2) * 0.05;
 
-                if (entity.block && Array.isArray(entity.block.entities)) {
-                    entity.block.entities.forEach(sub => {
-                        if (sub.type === 'LINE' && sub.vertices && sub.vertices.length >= 2) {
-                            const v1 = sub.vertices[0];
-                            const v2 = sub.vertices[1];
-                            const geo = new THREE.BufferGeometry().setFromPoints([
-                                new THREE.Vector3(v1.x, v1.y, v1.z || 0),
-                                new THREE.Vector3(v2.x, v2.y, v2.z || 0)
-                            ]);
-                            const line = new THREE.Line(geo, dimMat);
-                            line.userData.layer = layerName;
-                            group.add(line);
-                        }
-                        if (sub.type === 'ARC') {
-                            const c = sub.center;
-                            const r = sub.radius;
-                            const start = sub.startAngle || 0;
-                            const end = sub.endAngle || Math.PI * 2;
-                            const curve = new THREE.ArcCurve(
-                                c.x,
-                                c.y,
-                                r,
-                                start,
-                                end,
-                                false
-                            );
-                            const pts = curve.getPoints(16).map(p => new THREE.Vector3(p.x, p.y, c.z || 0));
-                            const geo = new THREE.BufferGeometry().setFromPoints(pts);
-                            const arc = new THREE.Line(geo, dimMat);
-                            arc.userData.layer = layerName;
-                            group.add(arc);
-                        }
-                    });
-                } else {
-                    const p1 = entity.firstPoint || entity.definitionPoint || entity.defPoint2;
-                    const p2 = entity.secondPoint || entity.defPoint3;
-                    if (p1 && p2) {
-                        const geo = new THREE.BufferGeometry().setFromPoints([
-                            new THREE.Vector3(p1.x, p1.y, p1.z || 0),
-                            new THREE.Vector3(p2.x, p2.y, p2.z || 0)
+                    function addTick(pos) {
+                        const tGeo = new THREE.BufferGeometry().setFromPoints([
+                            pos.clone().add(normal.clone().multiplyScalar(tickSize * 0.5)),
+                            pos.clone().add(normal.clone().multiplyScalar(-tickSize * 0.5))
                         ]);
-                        const line = new THREE.Line(geo, dimMat);
-                        line.userData.layer = layerName;
-                        group.add(line);
-                    } else {
-                        console.warn('DIMENSION sin puntos claros:', entity);
+                        const tick = new THREE.Line(tGeo, mat);
+                        tick.userData.layer = layerName;
+                        group.add(tick);
+                    }
+                    addTick(v1);
+                    addTick(v2);
+
+                    // Texto de cota
+                    let dimText = entity.text;
+                    if (!dimText || dimText === '<>' || dimText.trim() === '') {
+                        dimText = parseFloat((entity.actualMeasurement || 0).toFixed(2)).toString();
+                    }
+                    const tPos = entity.middleOfText || entity.textMidPoint || entity.anchorPoint;
+                    if (dimText && tPos) {
+                        const sprite = makeTextSprite(dimText, { fontsize: 14 });
+                        sprite.position.set(tPos.x, tPos.y, tPos.z || 0);
+                        // Rotación
+                        const angle = Math.atan2(v2.y - v1.y, v2.x - v1.x);
+                        sprite.rotation.z = angle;
+                        sprite.userData.layer = layerName;
+                        group.add(sprite);
                     }
                 }
-
-                // Texto de la cota (si viene plain text)
-                const dimText = entity.text || entity.actualMeasurement?.toString?.();
-                const textPos = entity.textMidPoint || entity.middleOfText || entity.textPosition;
-                if (dimText && textPos) {
-                    const sprite = makeTextSprite(dimText.toString(), {
-                        fontsize: 14,
-                        textColor: '#ffffff',
-                        backgroundColor: 'rgba(0,0,0,0.0)'
-                    });
-                    sprite.position.set(textPos.x, textPos.y, (textPos.z || 0));
-                    sprite.userData.layer = layerName;
-                    group.add(sprite);
-                }
             }
-            // MTEXT (texto general)
+            // MTEXT
             else if (entity.type === 'MTEXT') {
-                // dxf-parser suele exponer 'text' o similar, y 'position'
                 const rawText = entity.text || entity.textValue || '';
-                if (!rawText) return;
                 const pos = entity.position || entity.insertPoint;
-                if (!pos) return;
-
-                // MTEXT trae códigos de formato (\P, \A, etc.) que ignoramos por ahora.[web:28][web:29][web:30]
-                const plain = rawText
-                    .replace(/\\P/g, '\n')
-                    .replace(/\\[A-Za-z].*?;/g, '')
-                    .trim();
-
-                if (!plain) return;
-
-                const sprite = makeTextSprite(plain, {
-                    fontsize: 14,
-                    textColor: '#ffffff',
-                    backgroundColor: 'rgba(0,0,0,0.0)'
-                });
-                sprite.position.set(pos.x, pos.y, (pos.z || 0));
-                sprite.userData.layer = layerName;
-                group.add(sprite);
+                if (rawText && pos) {
+                    const plain = rawText.replace(/\\P/g, '
+').replace(/\\[A-Za-z].*?;/g, '').trim();
+                    if (plain) {
+                        const sprite = makeTextSprite(plain, { fontsize: 14 });
+                        sprite.position.set(pos.x, pos.y, pos.z || 0);
+                        sprite.userData.layer = layerName;
+                        group.add(sprite);
+                    }
+                }
             }
 
             if (mesh) {
@@ -387,8 +351,6 @@
         });
     }
 
-    // ── 4. CÁMARAS Y ANIMACIÓN ──────────────────────────────────────────────
-
     function setCameraMode(mode) {
         cameraMode = mode;
         if (mode === 'orbit') {
@@ -411,10 +373,8 @@
         const aspect = window.innerWidth / window.innerHeight;
         const halfH = modelSpan * 0.8;
         const halfW = halfH * aspect;
-        orthoCamera.left = -halfW;
-        orthoCamera.right = halfW;
-        orthoCamera.top = halfH;
-        orthoCamera.bottom = -halfH;
+        orthoCamera.left = -halfW; orthoCamera.right = halfW;
+        orthoCamera.top = halfH; orthoCamera.bottom = -halfH;
         orthoCamera.position.set(modelCenter.x, modelCenter.y + modelSpan * 2, modelCenter.z);
         orthoCamera.lookAt(modelCenter);
         orthoCamera.updateProjectionMatrix();
@@ -422,8 +382,7 @@
 
     function resetCamera() {
         if (!modelGroup) return;
-        const d = modelSpan;
-        orbitCamera.position.set(modelCenter.x, modelCenter.y + d, modelCenter.z + d);
+        orbitCamera.position.set(modelCenter.x, modelCenter.y + modelSpan, modelCenter.z + modelSpan);
         orbitControls.target.copy(modelCenter);
         orbitControls.update();
         if (cameraMode === 'ortho') syncOrthoCamera();
@@ -450,38 +409,29 @@
         });
     }
 
-    // ── 5. INICIALIZACIÓN ───────────────────────────────────────────────────
-
     function init() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050608);
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
-
         const aspect = window.innerWidth / window.innerHeight;
         orbitCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000000);
         orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000000);
         activeCamera = orbitCamera;
-
         orbitControls = new THREE.OrbitControls(orbitCamera, renderer.domElement);
         orbitControls.enableDamping = true;
-
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);
             orbitCamera.aspect = window.innerWidth / window.innerHeight;
             orbitCamera.updateProjectionMatrix();
             syncOrthoCamera();
         });
-
         document.querySelectorAll('.cam-btn[data-mode]').forEach(btn => {
             btn.addEventListener('click', () => setCameraMode(btn.dataset.mode));
         });
-
         loadModel();
-
         function animate() {
             requestAnimationFrame(animate);
             orbitControls.update();
@@ -489,6 +439,5 @@
         }
         animate();
     }
-
     init();
 })();
