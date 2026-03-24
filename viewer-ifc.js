@@ -598,27 +598,15 @@ function setupCollectionSideNav(allData, currentItem) {
   const itemList = document.getElementById('collItemList');
   if (!itemList) return;
 
-  itemList.innerHTML = siblings
-    .map((i) => {
-      let url = '';
-      if (i.categoria === 'modelo-3d') {
-        // Visor 3DM
-        url = `viewer.html?file=models/${i.archivo}`;
-      } else if (i.categoria === 'mapa') {
-        // Visor mapas
-        url = `viewer-map.html?id=${i.id}`;
-      } else if (i.categoria === 'ifc') {
-        // Visor IFC
-        url = `viewer-ifc.html?id=${i.id}`;
-      } else {
-        // Resto: visor multimedia
-        url = `viewer-media.html?id=${i.id}`;
-      }
-      return `<a href="${url}" class="coll-item ${
-        i.id === currentItem.id ? 'active' : ''
-      }">${i.nombre || i.titulo || i.id}</a>`;
-    })
-    .join('');
+itemList.innerHTML = siblings.map(i => {
+    // Determinamos el visor dinámicamente con fallback a 'media'
+    const visorType = i.visor || 'media';
+    const url = `viewer-${visorType}.html?id=${i.id}`;
+
+    return `<a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">
+        ${i.nombre || i.titulo || i.id}
+    </a>`;
+}).join('');
 
   const tab = document.getElementById('collTab');
   tab?.addEventListener('click', (e) => {
