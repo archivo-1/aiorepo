@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Repositorio Digital Vertigo - Visor CAD DXF</title>
+    <title>Aio - Visor CAD DXF</title>
     <style>
         /* Reutilizamos exactamente tus estilos de viewer.html para mantener consistencia */
         * { box-sizing: border-box; }
@@ -154,21 +154,26 @@
         function setupCollectionSideNav(allData, currentItem) {
             const collName = currentItem.coleccion;
             if (!collName) return;
+
             const siblings = allData.filter(i => i.coleccion === collName);
             if (siblings.length <= 1) return;
 
             const container = document.getElementById('collection-nav');
             container.style.display = 'flex';
+            
+            const label = document.getElementById('collNameLabel');
+            if (label) label.textContent = collName;
+
             const itemList = document.getElementById('collItemList');
             itemList.innerHTML = siblings.map(i => {
-                let url = "";
-                const ext = i.archivo ? i.archivo.split('.').pop().toLowerCase() : "";
-                if (ext === 'dxf') url = `viewer-dxf.html?id=${i.id}`;
-                else if (ext === 'ifc') url = `viewer-ifc.html?id=${i.id}`;
-                else if (i.categoria === 'modelo-3d') url = `viewer.html?file=models/${i.archivo}`;
-                else url = `viewer-media.html?id=${i.id}`;
-
-                return `<a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">${i.nombre}</a>`;
+                // Lógica dinámica: usa el visor indicado o 'media' por defecto
+                const visorType = i.visor || 'media';
+                const url = `viewer-${visorType}.html?id=${i.id}`;
+                
+                return `
+                    <a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">
+                        ${i.nombre}
+                    </a>`;
             }).join('');
 
             document.getElementById('collTab').addEventListener('click', () => container.classList.toggle('open'));
