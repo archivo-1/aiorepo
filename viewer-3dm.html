@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aio Archivo-1 - Visor de 3dm</title>
+    <title>Repositorio Digital Vertigo - Visor 3D Archvista</title>
     <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #050608; color: #f5f5f5; font-family: system-ui, -apple-system, sans-serif; }
@@ -80,7 +80,7 @@
         /* Model title */
         #model-title { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font-size: 0.78rem; font-weight: 500; color: #6b7280; pointer-events: none; z-index: 10; letter-spacing: 0.03em; white-space: nowrap; }
 
-        /* ── GUI: SOLAPA EXPANDIBLE (Copiado de viewer-media.html) ── */
+        /* ── GUI: SOLAPA EXPANDIBLE ── */
         .collection-nav-container { 
             position: fixed; 
             top: 50%; 
@@ -314,6 +314,7 @@
     <script src="https://cdn.jsdelivr.net/npm/rhino3dm@8.4.0/rhino3dm.min.js"></script>
     <script src="viewer-3dm.js"></script>
     <script>
+        // 1. Escuchar cambios de modo de cámara
         document.addEventListener('modchange', function(e) {
             document.getElementById('orbit-controls').style.display = e.detail === 'orbit' ? '' : 'none';
             document.getElementById('walk-controls').style.display = e.detail === 'walk' ? '' : 'none';
@@ -323,37 +324,44 @@
             if (hint) hint.classList.toggle('visible', e.detail === 'walk' || e.detail === 'fly');
         });
 
+        // 2. Inicialización por ID
         (async function() {
-            const p = new URLSearchParams(window.location.search);
-            const m = p.get('file') || p.get('model') || '';
-            const nameFallback = m.split('/').pop().replace(/\.3dm$/i, '').replace(/[-_]/g, ' ');
-            const el = document.getElementById('model-title');
-            if (el && nameFallback) el.textContent = nameFallback;
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
 
-            if (!m) return;
+            if (!id) {
+                console.error("No se encontró el ID en la URL");
+                return;
+            }
 
             try {
                 const res = await fetch('content.json');
                 const data = await res.json();
-                
-                // Extraer solo el nombre del archivo para comparar contra el JSON de forma segura
-                const targetFile = decodeURIComponent(m).split('/').pop().trim().toLowerCase();
-                
-                const currentItem = data.find(item => {
-                    if (!item.archivo) return false;
-                    const jsonFile = decodeURIComponent(item.archivo).split('/').pop().trim().toLowerCase();
-                    return jsonFile === targetFile;
-                });
+                const currentItem = data.find(item => item.id === id);
 
                 if (currentItem) {
-                    if (el) el.textContent = currentItem.nombre; // Usamos el nombre limpio del JSON
+                    document.title = `Visor - ${currentItem.nombre}`;
+                    const titleEl = document.getElementById('model-title');
+                    if (titleEl) titleEl.textContent = currentItem.nombre;
+
+                    const path = currentItem.archivo.startsWith('http') 
+                                 ? currentItem.archivo 
+                                 : `models/${currentItem.archivo}`;
+                    
+                    if (window.initViewer) {
+                        window.initViewer(path);
+                    } else {
+                        console.log("Cargando archivo:", path);
+                    }
+
                     setupCollectionSideNav(data, currentItem);
                 }
             } catch (err) {
-                console.warn("Error cargando colección:", err);
+                console.error("Error inicializando visor:", err);
             }
         })();
 
+        // 3. Función de Solapa Lateral (Versión Dinámica con fallback a media)
         function setupCollectionSideNav(allData, currentItem) {
             const collName = currentItem.coleccion;
             if (!collName) return;
@@ -363,39 +371,27 @@
 
             const container = document.getElementById('collection-nav');
             container.style.display = 'flex';
-            document.getElementById('collNameLabel').textContent = collName;
+            
+            const label = document.getElementById('collNameLabel');
+            if (label) label.textContent = collName;
 
             const itemList = document.getElementById('collItemList');
             itemList.innerHTML = siblings.map(i => {
-            let url = "";
-            const archivo = String(i.archivo || "");
-            const ext = archivo.split('.').pop().toLowerCase();
-
-            if (i.categoria === 'mapa') {
-                url = `viewer-map.html?id=${i.id}`;
-            } else if (i.categoria === 'modelo-3d') {
-                if (ext === 'ifc') {
-                // IFC → visor IFC por id
-                url = `viewer-ifc.html?id=${i.id}`;
-                } else {
-                // 3DM u otros modelos → visor 3D
-                url = `viewer.html?file=models/${i.archivo}`;
-                }
-            } else {
-                // Resto: media (video, pdf, enlace, imagen, etc.)
-                url = `viewer-media.html?id=${i.id}`;
-            }
-
-            return `<a href="${url}" class="coll-item ${
-                i.id === currentItem.id ? 'active' : ''
-            }">${i.nombre}</a>`;
+                // Lógica dinámica: usa el visor indicado o 'media' por defecto
+                const visorType = i.visor || 'media';
+                const url = `viewer-${visorType}.html?id=${i.id}`;
+                
+                return `
+                    <a href="${url}" class="coll-item ${i.id === currentItem.id ? 'active' : ''}">
+                        ${i.nombre}
+                    </a>`;
             }).join('');
 
             const tab = document.getElementById('collTab');
-            tab.addEventListener('click', (e) => {
+            tab.onclick = (e) => {
                 e.stopPropagation();
                 container.classList.toggle('open');
-            });
+            };
 
             document.addEventListener('pointerdown', (e) => {
                 if (!container.contains(e.target) && container.classList.contains('open')) {
