@@ -176,13 +176,13 @@
     }
     
     let MODELS = [];
-    const CATEGORIAS = ['modelo-3d', 'pdf', 'video', 'galeria', 'enlace', 'audio','mapa'];
+    const CATEGORIAS = ['modelo-3d', 'modelo-2d', 'modelo-BIM', 'pdf', 'video', 'galeria', 'enlace', 'audio','mapa'];
     let activeFilter = 'all';
     let searchQuery = '';
     let currentSort = 'coleccion';
 
     const nombresCategoria = {
-        'modelo-3d': 'Modelo 3D', 'pdf': 'PDF', 'video': 'Video',
+        'modelo-3d': 'Modelo 3D','modelo-2d': 'Modelo 2D','modelo-BIM': 'Modelo BIM', 'pdf': 'PDF', 'video': 'Video',
         'galeria': 'Galería', 'enlace': 'Enlace', 'audio': 'Audio', 'mapa': 'Mapa'
     };
 
@@ -292,37 +292,13 @@
         
         // --- NAVEGACIÓN DIRECTA CON STOP PROPAGATION ---
         card.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation(); // ¡CRUCIAL! Evita que el clic suba al contenedor
+    e.preventDefault();
+    e.stopPropagation();
 
-            if (m.categoria === 'modelo-3d') {
-                const archivo = String(m.archivo || '');
-                const ext = archivo.split('.').pop().toLowerCase();
-
-                if (ext === 'ifc') {
-                    // Modelos BIM → visor IFC (usa id, como en otros viewers)
-                    window.location.href = `viewer-ifc.html?id=${m.id}`;
-                }
-                else if (ext === 'dxf') {
-                    // Modelos dxf → visor dxf (usa id, como en otros viewers)
-                    window.location.href = `viewer-dxf.html?id=${m.id}`;
-                } else {
-                    // Modelos 3Dm  
-                    window.location.href = `viewer.html?file=models/${m.archivo}`;
-                }
-            } else if (m.categoria === 'mapa') {
-                window.location.href = `viewer-map.html?id=${m.id}`;
-            } else if (m.categoria === 'video') {
-                window.location.href = `viewer-media.html?id=${m.id}`;
-            } else if (m.categoria === 'pdf') {
-                window.location.href = `viewer-media.html?id=${m.id}`;
-            } else if (m.categoria === 'enlace') {
-                window.location.href = `viewer-media.html?id=${m.id}`;
-            } else {
-                // fallback genérico
-                window.location.href = `viewer-media.html?id=${m.id}`;
-            }
-        };
+    // Ahora el index no adivina. El JSON le dice exactamente a dónde ir.
+    // Estandarizamos TODO para usar "?id="
+    window.location.href = `viewer-${m.visor}.html?id=${m.id}`;
+    };
 
         const thumb = m.thumbnail ? `<img src="${m.thumbnail}" alt="">` : `<div style="color:#1e2535">📁</div>`;
         card.innerHTML = `
