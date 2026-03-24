@@ -39,7 +39,7 @@
     // ── Helpers ─────────────────────────────────────────────────────────────
     function getModelFromQuery() {
         const p = new URLSearchParams(window.location.search);
-        return p.get('file') || 'torpederas-valparaisoCLS.3dm';
+        return p.get('id') || 'torpederas-valparaisoCLS.3dm';
     }
     function showLoading(msg) {
         const el = document.getElementById('loading');
@@ -385,15 +385,22 @@
     }
 
     async function loadModel() {
-        const name = getModelFromQuery();
-        showLoading('Loading ' + name + '...');    
-
-        // Cargamos la configuración de UI antes de procesar el Rhino
         const config = await loadModelConfig();
+    
+    if (!config || (!config.archivo && !config.file)) {
+        showLoading('Error: Model ID not found in database');
+        return;
+    }
+
+    // 2. Extract the actual file path from the JSON entry
+    const filePath = config.archivo || config.file;
+    const displayName = config.nombre || filePath; // Optional: use a friendly name for UI
+
+    showLoading('Loading ' + displayName + '...');
 
         rhino3dm().then(async rhino => {
             try {
-                const res = await fetch(name);
+                const res = await fetch(filePath);
                 if (!res.ok) throw new Error('Model not found');
                 const doc = rhino.File3dm.fromByteArray(new Uint8Array(await res.arrayBuffer()));
                 const group = processDocObjects(doc, rhino, document.getElementById('toggle-shadows').checked);
@@ -421,21 +428,21 @@
     // --- NUEVAS FUNCIONES DE UI (INTEGRADAS) ---
 
     async function loadModelConfig() {
-        const modelName = decodeURIComponent(getModelFromQuery());
-        try {
-            const res = await fetch('content.json');
-            if (!res.ok) return null;
-            const models = await res.json();
-            // Buscamos coincidencia exacta o si la URL termina en el nombre del archivo
-            return models.find(m => 
-                (m.archivo && (m.archivo === modelName || modelName.endsWith(m.archivo))) || 
-                (m.file && (m.file === modelName || modelName.endsWith(m.file)))
-            )?.uiConfig || null;
-        } catch (e) {
-            console.warn("Config no disponible:", e);
-            return null;
-        }
+    const modelId = getModelFromQuery(); // Now returns the ID (e.g., '3DM_DEMO01')
+    try {
+        const res = await fetch('content.json');
+        if (!res.ok) return null;
+        const models = await res.json();
+        
+        // Search the JSON for a matching ID
+        const match = models.find(m => m.id === modelId);
+        
+        return match || null; 
+    } catch (e) {
+        console.warn("Config not available:", e);
+        return null;
     }
+}
 
     function applyUIConfig(config) {
         if (!config) return;
